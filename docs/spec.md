@@ -38,22 +38,29 @@ people use it, and it shows the protocol working. This app plays the same part f
 
 **Receiver**
 1. Signs in with email and a one-time code. This works on every platform without a wallet.
-2. Adds a payout address: connects a Stellar wallet, or pastes or scans an address. See section 6
+2. Picks a handle. `pomi.app/<handle>` is their page (section 6).
+3. Adds a payout address: connects a Stellar wallet, or pastes or scans an address. See section 6
    for the checks.
-3. Creates a request:
-   - amount and asset (XLM or USDC on Stellar)
+4. Sets up the pay box on their page: an asset, and either a fixed amount or the payer's choice,
+   with an optional minimum.
+5. Creates requests:
+   - a fixed amount and asset (XLM or USDC on Stellar)
    - a note
-   - single-use (an invoice) or reusable (a tip page)
+   - single-use (an invoice) or reusable (the same amount, paid any number of times)
+   - listed on their page, or unlisted and reachable only by its link (the default for invoices)
    - an optional end date
-4. Shares the link or QR code.
-5. Sees each request's status, and gets a push notification on mobile or an email when paid.
+6. Shares their page, a request's link, or either one's QR code.
+7. Sees each request's status, and gets a push notification on mobile or an email when paid.
 
 **Payer**
-1. Opens `https://pomi.app/r/<request id>` on any device. No account is needed.
-2. Sees who is asking, how much, and the note.
-3. Pays through the Useroutr checkout: any token or chain in the catalog, from a connected Stellar
-   or EVM wallet, or by sending to an address. The QR code carries a payment request (SEP-7 on
-   Stellar, EIP-681 on EVM networks) once the packages from `main` are published.
+1. Opens `https://pomi.app/<handle>` or a request's `https://pomi.app/r/<request id>` on any
+   device. No account is needed.
+2. On a handle page, sees who it is, the pay box, and the receiver's listed requests. On a request,
+   sees who is asking, how much, and the note.
+3. In the pay box, enters an amount (or sees the fixed one), then pays through the Useroutr
+   checkout: any token or chain in the catalog, from a connected Stellar or EVM wallet, or by
+   sending to an address. The QR code carries a payment request (SEP-7 on Stellar, EIP-681 on EVM
+   networks).
 4. Sees a confirmation once Useroutr has credited the payment. Never earlier.
 
 ## 4. How it uses Useroutr
@@ -69,15 +76,16 @@ The whole app is **one Useroutr application** with one API key, held by its back
 | A payment that cannot complete the request | `payment.rejected` and `refund.*` events. Useroutr refunds the payer by its own rules, and sends `refund.destination_required` when it cannot tell where the money should go (section 9). |
 
 **One intent per visit, not per request.** An intent lasts at most 24 hours (30 minutes by
-default: `FUNDING_INTENT_MAX_TTL_SECONDS`, `FUNDING_INTENT_DEFAULT_TTL_SECONDS`). A request can
-stay open for weeks, so the app creates an intent when a payer arrives, as Stripe Payment Links
-do:
+default). A request can stay open for weeks, so the app creates an intent when a payer arrives,
+as Stripe Payment Links do:
 - **Single-use request.** At most one live intent at a time, shared by every visitor. A second
   visitor resumes the same checkout. If two people pay anyway, the second payment is an
   overpayment or a duplicate, which Useroutr refunds to that payer. Once one intent is credited,
   the request closes and no new intent is created.
-- **Reusable request.** Each visit creates its own intent, and each credited intent is one
-  payment on the request.
+- **Reusable request**, including the pay box on a handle page. Each visit creates its own
+  intent, and each credited intent is one payment on the request. When the payer chooses the
+  amount, the backend checks it (`parseRequestAmount`, then the minimum) and the intent asks for
+  exactly that amount.
 
 **Webhooks** come into the app's backend:
 - The signature is checked with `useroutr.webhooks.constructEvent` over the raw body.
@@ -148,6 +156,11 @@ Paying by hand works everywhere, so any payer can always pay.
 
 - **Sign-in is email with a one-time code,** so no platform depends on a wallet signing. A session
   is a sealed cookie on the web and a token in the secure store on mobile.
+- **A handle** names a receiver's page, `pomi.app/<handle>`. It is 3 to 30 characters: lowercase
+  letters, digits and single hyphens, starting with a letter and not ending with a hyphen. Words
+  the app's own routes use (`r`, `api`, `dashboard`, `settings` and others) and names that would
+  pass for Pomi or Useroutr are reserved (`parseHandle` in `packages/shared`). A handle cannot be
+  changed in phase 1, so links already shared keep working.
 - **A payout address** is connected or pasted. Before it is saved, the backend checks:
   - the account exists, since a new Stellar account needs at least 1 XLM
   - it trusts the asset the receiver wants (USDC needs a trustline)
@@ -157,16 +170,18 @@ Paying by hand works everywhere, so any payer can always pay.
   Each failure says what to do in the receiver's wallet. Useroutr refuses a missing account or
   trustline itself (`INVALID_DESTINATION`), but only when an intent is created, which is when a
   payer opens the link; checking at save spares the receiver a broken request. Useroutr does
-  not refuse an address that requires a memo, so that check is the app's, and it is not optional: a payment to an exchange's shared account without a memo cannot
-  be credited to the receiver.
+  not refuse an address that requires a memo, so that check is the app's, and it is not
+  optional: a payment to an exchange's shared account without a memo cannot be credited to the
+  receiver.
 - **Ownership.** Connecting a wallet and signing a short message (SEP-53) marks the address
   verified, and the pay page shows that. A pasted address works but is shown as unverified.
   Payments to an address only ever reach that address, so the risk is impersonation, not theft.
   The app signs through Stellar Wallets Kit's `signMessage` directly: `WalletConnector` in
   `@useroutr/checkout-core` has no message signing. Which wallets in the kit sign SEP-53 messages
   is to be checked.
-- **What the pay page shows the payer:** the receiver's chosen display name, the verification mark,
-  the amount, the note and the shortened address. Nothing else about the receiver.
+- **What a pay page or handle page shows the payer:** the receiver's chosen display name and
+  handle, the verification mark, the amount, the note and the shortened address, and on a handle
+  page the listed requests. Nothing else about the receiver, and never their email.
 
 ## 7. Data
 
@@ -175,24 +190,32 @@ transaction.
 
 | Table | Key fields | Constraints |
 |---|---|---|
-| `users` | id, email, display_name | email unique |
-| `payout_addresses` | user_id, address, verified_at | one active address per user |
-| `requests` | id, user_id, amount, asset_id, note, kind (`single` / `reusable`), status (`open` / `paid` / `closed`), ends_at | |
-| `request_intents` | request_id, funding_intent_id, funding_token, visit_id, status | `funding_intent_id` unique. A partial unique index allows one live intent per single-use request. |
-| `request_payments` | request_id, funding_intent_id, amount, credited_at | `funding_intent_id` unique, so one credit counts once |
+| `users` | id, email, handle, display_name | email unique; handle unique, and its format checked |
+| `payout_addresses` | user_id, address, active, verified_at | one active address per user; the address is a Stellar account (`G…`) |
+| `requests` | id, user_id, kind (`single` / `reusable`), amount_kind (`fixed` / `open`), amount, minimum_amount, asset_id, note, listed, pay_box, status (`open` / `paid` / `closed`), ends_at | a fixed request has an amount and no minimum, an open one has no amount; amounts are positive; a single-use request is fixed; the pay box is reusable and one per user; a note is at most 280 characters |
+| `request_intents` | request_id, funding_intent_id, funding_token, visit_id, amount, exclusive, state (`open` / `closed`) | `funding_intent_id` unique; one per request and visit; one open intent per single-use request (`exclusive`), by a partial unique index |
+| `request_payments` | request_id, funding_intent_id, amount, asset_id, credited_at | `funding_intent_id` unique, so one credit counts once |
 | `refunds` | refund_id, funding_intent_id, status, destination_required_at | `refund_id` unique |
-| `webhook_events` | event_id, type, processed_at | `event_id` unique |
-| `devices` | user_id, push_token, platform | |
+| `webhook_events` | event_id, type, received_at, processed_at | `event_id` unique |
+| `devices` (phase 2) | user_id, push_token, platform | `push_token` unique |
+
+Request ids are random and unguessable, so an unlisted request is private to whoever has its
+link. An open-amount intent records the amount the payer chose. Partial unique indexes and check
+constraints are SQL in the migrations, because Prisma's schema cannot express them; the schema
+names each one.
 
 ## 8. The app's own API
 
 | Endpoint | Who | Does |
 |---|---|---|
 | `POST /auth/code`, `POST /auth/verify` | anyone | Email sign-in |
+| `POST /me/handle` | receiver | Claim a handle, once |
 | `GET/PUT /me/payout-address` | receiver | Read or set the payout address, with the checks in section 6 |
-| `POST /requests`, `GET /requests`, `POST /requests/:id/close` | receiver | Manage requests |
+| `GET/PUT /me/pay-box` | receiver | Read or set the pay box: asset, fixed amount or the payer's choice, minimum |
+| `POST /requests`, `GET /requests`, `PATCH /requests/:id`, `POST /requests/:id/close` | receiver | Manage requests, including listing or unlisting them |
+| `GET /profiles/:handle` | anyone | A handle page: name, verification mark, pay box and listed requests |
 | `GET /r/:id` | anyone | The public view of a request |
-| `POST /r/:id/checkout` | anyone | Reuses or creates the funding intent; returns its funding token for the checkout |
+| `POST /r/:id/checkout` | anyone | Reuses or creates the funding intent; returns its funding token for the checkout. For an open amount, the body carries the payer's amount. |
 | `POST /webhooks/useroutr` | Useroutr | Signed events |
 | `POST /devices` | receiver | Register a push token |
 
@@ -202,7 +225,9 @@ transaction.
   which grants one intent.
 - Webhooks are verified and processed once each.
 - Request notes are limited in length, rendered as plain text, and never auto-linked, to reduce
-  phishing. Any request can be reported, and the operator can close it.
+  phishing. Any request or handle page can be reported, and the operator can close it.
+- Handles that would pass for Pomi, Useroutr or the app's own pages are reserved. Unlisted
+  requests have random ids, so a handle page never reveals them.
 - Checkout creation is rate limited per visitor and per IP address.
 - No funds, keys or balances exist in the app to steal. The sensitive data is email addresses and
   payout addresses, and neither is logged.
@@ -232,7 +257,8 @@ not enough. Phase 1 starts with the smaller slice in section 12.2.
 
 1. **Web.**
    - email sign-in and payout address checks
-   - single-use requests in XLM or USDC on Stellar
+   - single-use and reusable requests in XLM or USDC on Stellar
+   - handles and handle pages: the pay box, fixed or the payer's choice, and listed requests
    - the pay page with the Useroutr checkout and wallet payments, Stellar and EVM
    - the dashboard, webhook handling and email notifications
    - the operator's refund path in section 9
@@ -243,7 +269,6 @@ not enough. Phase 1 starts with the smaller slice in section 12.2.
    - the pay page in an in-app browser
    - App Store and Play Store releases
 3. **Wider.**
-   - reusable tip pages (unless decision 2 moves them into phase 1)
    - a native payer checkout on `@useroutr/checkout-core` with WalletConnect
    - receiving on Base or Arbitrum, through Useroutr's outbound rails
    - receipts
@@ -286,8 +311,9 @@ The smallest slice that proves the idea, before the rest of phase 1.
 - the webhook route: verify, process once, mark paid on `funding.credited`
 - the paid email to the receiver, and the request list with statuses
 
-**Not in it:** the mobile app, reusable requests, SEP-53 verification, reports and abuse
-limits beyond a basic per-IP limit, and receipts.
+**Not in it:** handle pages and reusable requests (they follow it in phase 1, on the same
+schema), the mobile app, SEP-53 verification, reports and abuse limits beyond a basic per-IP
+limit, and receipts.
 
 **Done when, on testnet** (the Useroutr sandbox):
 - one request is paid by hand with the QR code, and another from a Stellar wallet (Freighter or
@@ -327,11 +353,12 @@ Things to know about testnet:
 1. **The name, and the domain. Chosen on 2026-11-09: Pomi, on `pomi.app`.** Soft and abstract,
    as Luma is, and short enough to work as a profile link (`pomi.app/<handle>`, as
    `lu.ma/<event>` does). The domain is not registered yet.
-2. **Whether reusable requests ship in phase 1 or 2.** The data model allows both. A reusable link
-   creates an intent on every visit, so per-visitor limits matter from its first day. The first
-   milestone is single-use either way. A Linktree-style profile link, `pomi.app/<handle>`,
-   is a reusable request by another name: choosing it brings reusable requests into phase 1,
-   along with unique handles and reserved words such as `r` and `api`.
+2. **Reusable requests and handle pages. Decided on 2026-11-09: both in phase 1.** A handle page,
+   `pomi.app/<handle>`, has a pay box (the payer picks the amount, above an optional minimum, or
+   pays a fixed amount the receiver sets) and the receiver's listed requests. Single requests
+   stay at `pomi.app/r/<id>`, unlisted unless the receiver lists them. A reusable link creates an
+   intent on every visit, so per-visitor limits matter from its first day. The first milestone
+   is single-use; handle pages follow it.
 3. **Whether sign-in also offers "sign in with your Stellar wallet" beside email.** It would
    verify the payout address in the same step, but message signing differs by wallet, and is
    least certain on mobile.

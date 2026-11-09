@@ -13,9 +13,21 @@ jobs:
   check:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pomi
+          POSTGRES_PASSWORD: pomi
+          POSTGRES_DB: pomi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pomi -d pomi"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     env:
-      # Prisma reads it to generate the client. Nothing connects to it until the
-      # first migration brings a Postgres service into this job.
       DATABASE_URL: postgresql://pomi:pomi@localhost:5432/pomi
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -29,4 +41,6 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm db:migrate:deploy
+      - run: pnpm test:db
       - run: pnpm build

@@ -1,4 +1,7 @@
-// Models land with the first migration (docs/spec.md, sections 7 and 13.7).
+// Pomi's own records (docs/spec.md, section 7). Partial unique indexes and
+// check constraints cannot be written here; they are SQL at the end of the
+// migration that adds them, and each is named in a comment on its model.
+// Prisma leaves them in place when it generates a later migration.
 
 generator client {
   provider = "prisma-client"
@@ -7,4 +10,156 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+enum RequestKind {
+  SINGLE
+  REUSABLE
+}
+
+enum AmountKind {
+  FIXED
+  OPEN
+}
+
+enum RequestStatus {
+  OPEN
+  PAID
+  CLOSED
+}
+
+// Whether a funding intent can still take payment for its request.
+enum IntentState {
+  OPEN
+  CLOSED
+}
+
+// users_handle_format: the format parseHandle enforces in packages/shared.
+// users_email_lowercase.
+model User {
+  id          String   @id
+  // Stored lowercase.
+  email       String   @unique
+  // Chosen after the first sign-in, so absent until then.
+  handle      String?  @unique
+  displayName String?  @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  payoutAddresses PayoutAddress[]
+  requests        Request[]
+
+  @@map("users")
+}
+
+// payout_addresses_one_active_per_user: a partial unique index on user_id.
+// payout_addresses_stellar_account: the address is a Stellar account (G...).
+model PayoutAddress {
+  id         String    @id
+  userId     String    @map("user_id")
+  address    String
+  active     Boolean   @default(true)
+  verifiedAt DateTime? @map("verified_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("payout_addresses")
+}
+
+// requests_amount_matches_kind: FIXED has an amount and no minimum; OPEN has
+//   no amount.
+// requests_amounts_positive, requests_single_is_fixed,
+// requests_pay_box_is_reusable, requests_note_length.
+// requests_one_pay_box_per_user: a partial unique index on user_id.
+model Request {
+  id            String        @id
+  userId        String        @map("user_id")
+  kind          RequestKind
+  amountKind    AmountKind    @map("amount_kind")
+  // Stellar amounts: up to 12 whole digits and 7 decimal places.
+  amount        Decimal?      @db.Decimal(19, 7)
+  minimumAmount Decimal?      @map("minimum_amount") @db.Decimal(19, 7)
+  // A Useroutr asset id, such as asset_usdc_stellar.
+  assetId       String        @map("asset_id")
+  note          String?
+  // Shown on the receiver's handle page.
+  listed        Boolean       @default(false)
+  // The handle page's own pay box.
+  payBox        Boolean       @default(false) @map("pay_box")
+  status        RequestStatus @default(OPEN)
+  endsAt        DateTime?     @map("ends_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  closedAt      DateTime?     @map("closed_at")
+
+  user     User             @relation(fields: [userId], references: [id])
+  intents  RequestIntent[]
+  payments RequestPayment[]
+
+  @@index([userId, status])
+  @@map("requests")
+}
+
+// request_intents_one_open_exclusive: a partial unique index on request_id,
+//   for exclusive intents in the OPEN state.
+// request_intents_amount_positive.
+model RequestIntent {
+  id              String      @id
+  requestId       String      @map("request_id")
+  fundingIntentId String      @unique @map("funding_intent_id")
+  fundingToken    String      @map("funding_token")
+  visitId         String      @map("visit_id")
+  // What the intent asks for; for an open amount, what the payer chose.
+  amount          Decimal     @db.Decimal(19, 7)
+  // Set for a single-use request's intent, which every visitor shares.
+  exclusive       Boolean
+  state           IntentState @default(OPEN)
+  createdAt       DateTime    @default(now()) @map("created_at")
+  closedAt        DateTime?   @map("closed_at")
+
+  request Request @relation(fields: [requestId], references: [id])
+
+  @@unique([requestId, visitId])
+  @@map("request_intents")
+}
+
+// request_payments_amount_positive.
+model RequestPayment {
+  id              String   @id
+  requestId       String   @map("request_id")
+  // One credited funding intent counts as one payment, however often its
+  // webhook arrives.
+  fundingIntentId String   @unique @map("funding_intent_id")
+  amount          Decimal  @db.Decimal(19, 7)
+  assetId         String   @map("asset_id")
+  creditedAt      DateTime @map("credited_at")
+
+  request Request @relation(fields: [requestId], references: [id])
+
+  @@index([requestId])
+  @@map("request_payments")
+}
+
+model Refund {
+  // Useroutr's refund id.
+  id                    String    @id
+  fundingIntentId       String    @map("funding_intent_id")
+  // Useroutr's refund status as last reported.
+  status                String
+  destinationRequiredAt DateTime? @map("destination_required_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@index([fundingIntentId])
+  @@map("refunds")
+}
+
+model WebhookEvent {
+  // The Useroutr-Event-Id header: a delivery that comes again is refused here.
+  id          String    @id
+  type        String
+  receivedAt  DateTime  @default(now()) @map("received_at")
+  processedAt DateTime? @map("processed_at")
+
+  @@map("webhook_events")
 }

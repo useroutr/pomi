@@ -1,0 +1,21 @@
+# Local Postgres for development and the database tests. Port 5436 keeps it
+# clear of other projects' databases on the usual ports.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: pomi
+      POSTGRES_PASSWORD: pomi
+      POSTGRES_DB: pomi
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pomi -d pomi"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:

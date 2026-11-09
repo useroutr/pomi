@@ -19,6 +19,11 @@
     "test": {
       "dependsOn": ["^build", "prisma:generate"]
     },
+    "test:db": {
+      "dependsOn": ["^build", "prisma:generate"],
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL"]
+    },
     "dev": {
       "dependsOn": ["^build", "prisma:generate"],
       "cache": false,
