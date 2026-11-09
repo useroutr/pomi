@@ -1,0 +1,36 @@
+{
+  "name": "@pomi/web",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Pomi on the web: the pay page, the receiver dashboard, and the backend that holds the Useroutr key",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy"
+  },
+  "dependencies": {
+    "@pomi/shared": "workspace:*",
+    "@prisma/client": "7.10.0",
+    "@useroutr/sdk": "0.2.0",
+    "next": "16.3.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "0.0.1",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "prisma": "7.10.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.0"
+  }
+}

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.turbo/
+.next/
+.expo/
+next-env.d.ts
+expo-env.d.ts
+pnpm-lock.yaml
+apps/web/src/generated/
+apps/web/prisma/migrations/
+docs/
+CLAUDE.md

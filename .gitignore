@@ -1,0 +1,19 @@
+node_modules/
+dist/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+
+# Next.js
+.next/
+next-env.d.ts
+
+# Prisma
+apps/web/src/generated/
+
+*.log
+.DS_Store

@@ -1,0 +1,10 @@
+// Models land with the first migration (docs/spec.md, sections 7 and 13.7).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
