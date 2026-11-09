@@ -23,12 +23,14 @@ the web, is being built.
 
 ## Run it
 
-You need Node.js 22.12 or later (24 recommended), pnpm 10, and for the mobile app the Expo Go app
-or an iOS or Android simulator.
+You need Node.js 22.12 or later (24 recommended), pnpm 10, Docker for the local database, and
+for the mobile app the Expo Go app or an iOS or Android simulator.
 
 ```bash
 pnpm install
 cp apps/web/.env.example apps/web/.env
+docker compose up -d
+pnpm db:migrate
 pnpm --filter @pomi/web dev
 ```
 
@@ -46,6 +48,7 @@ pnpm format:check
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm test:db
 pnpm build
 ```
 

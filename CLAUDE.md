@@ -71,14 +71,17 @@ packages keep the `~` ranges Expo's tooling manages).
 
 ```bash
 pnpm install
+docker compose up -d                  # Postgres on localhost:5436
+pnpm db:migrate                       # apply migrations, or create one after a schema change
 pnpm dev                              # every app
 pnpm --filter @pomi/web dev           # web on :3000
 pnpm --filter @pomi/mobile start      # Expo dev server
-pnpm db:migrate                       # create and apply a migration locally
 ```
 
 Quality gate, required before work is called done: `pnpm format:check`, `pnpm lint`,
-`pnpm typecheck`, `pnpm test`, `pnpm build`. CI runs the same.
+`pnpm typecheck`, `pnpm test`, `pnpm test:db`, `pnpm build`. CI runs the same. `pnpm test`
+needs no database; `pnpm test:db` runs `*.db.test.ts` against the migrated Postgres in
+`DATABASE_URL`, emptying its tables, so never point it at a database you want to keep.
 
 ## 6. Coding standards
 
@@ -89,8 +92,10 @@ Quality gate, required before work is called done: `pnpm format:check`, `pnpm li
   stack traces or internal details.
 - One job per function. Route handlers stay thin: validate, authorize, call a service, respond.
   Database access goes through repositories; Useroutr goes through one client module.
-- Enforce invariants in the database (unique and partial unique indexes, foreign keys), and wrap
-  multi-step writes in a transaction.
+- Enforce invariants in the database (unique and partial unique indexes, check constraints,
+  foreign keys), and wrap multi-step writes in a transaction. Prisma's schema cannot express
+  partial indexes or checks: add them as SQL at the end of the migration, name each one in a
+  comment on its model, and test that it refuses what it should (`schema.db.test.ts`).
 - No dead code, debug output, commented-out code or `console.log`.
 
 ## 7. Testing
