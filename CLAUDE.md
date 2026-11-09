@@ -57,7 +57,7 @@ routes. Move it to a service of its own only when push and background work outgr
 |---|---|
 | Monorepo | pnpm workspaces, Turborepo |
 | Language | TypeScript 6.0, strict everywhere |
-| Web and backend | Next.js 16.3, React 19.3 |
+| Web and backend | Next.js 16.4, React 19.3 |
 | Mobile | Expo SDK 58, Expo Router, React Native 0.88 (React 19.3) |
 | Database | PostgreSQL, Prisma 7 |
 | Validation | zod 4 |

@@ -262,7 +262,7 @@ not enough. Phase 1 starts with the smaller slice in section 12.2.
 | Part | Choice | Why |
 |---|---|---|
 | Repository | pnpm workspaces and Turborepo, TypeScript strict | The same tools as Useroutr. One place for web, mobile and shared code. |
-| Web | Next.js (App Router) with React 19 | The checkout is a React component. Useroutr's own demo runs it on Next.js 16.3 and React 19.3. |
+| Web | Next.js (App Router) with React 19 | The checkout is a React component. Useroutr's own demo runs it on Next.js 16 and React 19. |
 | Backend | The Next.js server, in phase 1: route handlers for the app's API and the webhook, over a `src/server` layer of services and repositories | One deployment for the first milestone, and the way `apps/demo` already verifies webhooks. The mobile app calls the same routes with a bearer token. It moves to a service of its own when push and background work outgrow it. |
 | Database | PostgreSQL with Prisma | The constraints in section 7 need a real database. The same tools as Useroutr. |
 | Useroutr | `@useroutr/sdk` on the server; `@useroutr/checkout-react` and `@useroutr/checkout-wallets` on the pay page | Public packages only |
