@@ -132,18 +132,19 @@ describe("createUseroutrGateway", () => {
 
     await expect(gateway.createFundingIntent(newIntent)).resolves.toMatchObject({ id: "fi_1" });
     expect(calls).toHaveLength(3);
-    expect(sleeps).toEqual([300, 600]);
+    expect(sleeps).toEqual([1000, 2000]);
   });
 
-  it("gives up after five tries while the other request is still running", async () => {
-    const { gateway, calls } = gatewayAnswering(
-      Array.from({ length: 5 }, () => apiError(409, "IDEMPOTENCY_REQUEST_IN_PROGRESS")),
+  it("gives up once it has waited 90 seconds for the other request", async () => {
+    const { gateway, calls, sleeps } = gatewayAnswering(
+      Array.from({ length: 12 }, () => apiError(409, "IDEMPOTENCY_REQUEST_IN_PROGRESS")),
     );
 
     await expect(gateway.createFundingIntent(newIntent)).rejects.toMatchObject({
       code: "IDEMPOTENCY_REQUEST_IN_PROGRESS",
     });
-    expect(calls).toHaveLength(5);
+    expect(sleeps).toEqual([1000, 2000, 4000, 8000, 15000, 15000, 15000, 15000, 15000]);
+    expect(calls).toHaveLength(10);
   });
 
   it("reports a destination Useroutr refuses", async () => {

@@ -65,8 +65,12 @@ export interface UseroutrGatewayOptions {
 }
 
 const ASSET_CACHE_MS = 10 * 60_000;
-const IN_PROGRESS_RETRIES = 5;
-const IN_PROGRESS_DELAY_MS = 300;
+// Useroutr opens a deposit account and registers the intent on Stellar
+// before it answers: over 30 seconds on testnet, past the SDK's default
+// timeout. A visitor arriving meanwhile waits as long for the same answer.
+const CREATE_TIMEOUT_MS = 90_000;
+const IN_PROGRESS_WAIT_MS = 90_000;
+const IN_PROGRESS_MAX_DELAY_MS = 15_000;
 
 export function createUseroutrGateway(options: UseroutrGatewayOptions): UseroutrGateway {
   const client =
@@ -100,10 +104,12 @@ export function createUseroutrGateway(options: UseroutrGatewayOptions): Useroutr
       destination: { network: "stellar", asset: intent.assetId, address: intent.payoutAddress },
       reference: intent.reference,
     };
+    let waitedMs = 0;
     for (let attempt = 1; ; attempt += 1) {
       try {
         const created = await client.fundingIntents.create(body, {
           idempotencyKey: intent.idempotencyKey,
+          timeoutMs: CREATE_TIMEOUT_MS,
         });
         return {
           id: created.id,
@@ -113,12 +119,14 @@ export function createUseroutrGateway(options: UseroutrGatewayOptions): Useroutr
       } catch (error) {
         // Another visitor's identical request is still running; its answer
         // will be replayed to this one once it finishes.
+        const delayMs = Math.min(1000 * 2 ** (attempt - 1), IN_PROGRESS_MAX_DELAY_MS);
         if (
           error instanceof UseroutrError &&
           error.code === "IDEMPOTENCY_REQUEST_IN_PROGRESS" &&
-          attempt < IN_PROGRESS_RETRIES
+          waitedMs + delayMs <= IN_PROGRESS_WAIT_MS
         ) {
-          await sleep(IN_PROGRESS_DELAY_MS * attempt);
+          await sleep(delayMs);
+          waitedMs += delayMs;
           continue;
         }
         if (error instanceof UseroutrError && error.code === "INVALID_DESTINATION") {
