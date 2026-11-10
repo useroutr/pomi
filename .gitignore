@@ -11,6 +11,8 @@ coverage/
 # Next.js
 .next/
 next-env.d.ts
+# Written again by next dev on every start; CLAUDE.md holds this repo's agent rules.
+apps/web/AGENTS.md
 
 # Prisma
 apps/web/src/generated/
