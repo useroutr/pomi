@@ -20,6 +20,8 @@
     "@pomi/shared": "workspace:*",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
+    "@useroutr/checkout-react": "0.2.0",
+    "@useroutr/checkout-wallets": "0.2.0",
     "@useroutr/sdk": "0.2.0",
     "next": "16.4.5",
     "react": "19.3.0",
