@@ -2,7 +2,7 @@ import "server-only";
 import { createAuthService, type AuthService } from "./auth/auth-service";
 import { createCheckoutService, type CheckoutService } from "./checkout/checkout-service";
 import { serverConfig } from "./config";
-import { createDatabase } from "./database";
+import { createDatabase, type Database } from "./database";
 import { createEmailDelivery } from "./email/create-email-delivery";
 import { createOutboxSender, type OutboxSender } from "./notifications/outbox-sender";
 import {
@@ -25,15 +25,18 @@ interface AppServices {
 
 declare global {
   // Next's dev server evaluates server modules again after an edit. Kept on
-  // globalThis, the services, and the database pool with them, survive it
-  // instead of opening another pool each time.
-  var pomiAppServices: AppServices | undefined;
+  // globalThis, the database pool survives that instead of opening another
+  // pool each time. The services are rebuilt, so edits to them take effect.
+  var pomiDatabase: Database | undefined;
 }
 
+let services: AppServices | undefined;
+
 function appServices(): AppServices {
-  if (globalThis.pomiAppServices === undefined) {
+  if (services === undefined) {
     const config = serverConfig();
-    const database = createDatabase(config.databaseUrl);
+    globalThis.pomiDatabase ??= createDatabase(config.databaseUrl);
+    const database = globalThis.pomiDatabase;
     const emailDelivery = createEmailDelivery(config.email);
     const useroutr = createUseroutrGateway({
       apiKey: config.useroutr.apiKey,
@@ -45,7 +48,7 @@ function appServices(): AppServices {
       accountReader: createHorizonAccountReader({ horizonUrl: config.stellar.horizonUrl }),
       network: config.stellar.network,
     });
-    globalThis.pomiAppServices = {
+    services = {
       auth: createAuthService({ database, emailDelivery, authSecret: config.authSecret }),
       payoutAddresses,
       requests: createRequestService({ database, useroutr, payoutAddresses }),
@@ -60,7 +63,7 @@ function appServices(): AppServices {
       }),
     };
   }
-  return globalThis.pomiAppServices;
+  return services;
 }
 
 export const authService = () => appServices().auth;
