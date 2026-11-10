@@ -154,8 +154,13 @@ Paying by hand works everywhere, so any payer can always pay.
 
 ## 6. Identity and payout addresses
 
-- **Sign-in is email with a one-time code,** so no platform depends on a wallet signing. A session
-  is a sealed cookie on the web and a token in the secure store on mobile.
+- **Sign-in is email with a one-time code,** so no platform depends on a wallet signing. A code is
+  six digits and works for 10 minutes and five tries, and only the newest code for an address
+  counts. An address gets at most one code a minute and five an hour. The first code entered for
+  an address creates its account.
+- **A session** is a random token that the database stores only as a hash, so it can be ended
+  from the server. It lasts 30 days. On the web it is an HttpOnly cookie that page scripts cannot
+  read; on mobile it will be a bearer token in the secure store.
 - **A handle** names a receiver's page, `pomi.app/<handle>`. It is 3 to 30 characters: lowercase
   letters, digits and single hyphens, starting with a letter and not ending with a hyphen. Words
   the app's own routes use (`r`, `api`, `dashboard`, `settings` and others) and names that would
@@ -197,6 +202,8 @@ transaction.
 | `request_payments` | request_id, funding_intent_id, amount, asset_id, credited_at | `funding_intent_id` unique, so one credit counts once |
 | `refunds` | refund_id, funding_intent_id, status, destination_required_at | `refund_id` unique |
 | `webhook_events` | event_id, type, received_at, processed_at | `event_id` unique |
+| `sign_in_codes` | email, code_hash, attempts, expires_at, consumed_at | email lowercase; the code is stored as an HMAC keyed by the server's secret |
+| `sessions` | user_id, token_hash, expires_at, revoked_at | `token_hash` unique |
 | `devices` (phase 2) | user_id, push_token, platform | `push_token` unique |
 
 Request ids are random and unguessable, so an unlisted request is private to whoever has its
@@ -206,9 +213,13 @@ names each one.
 
 ## 8. The app's own API
 
+Every endpoint is under `/api`, apart from the pages, and takes and returns JSON. An error has the
+shape `{ "error": { "code", "message" } }`, and its message can be shown to the person.
+
 | Endpoint | Who | Does |
 |---|---|---|
-| `POST /auth/code`, `POST /auth/verify` | anyone | Email sign-in |
+| `POST /auth/code`, `POST /auth/verify` | anyone | Email sign-in. Verifying sets the session cookie. |
+| `POST /auth/sign-out` | receiver | Ends the session |
 | `POST /me/handle` | receiver | Claim a handle, once |
 | `GET/PUT /me/payout-address` | receiver | Read or set the payout address, with the checks in section 6 |
 | `GET/PUT /me/pay-box` | receiver | Read or set the pay box: asset, fixed amount or the payer's choice, minimum |
