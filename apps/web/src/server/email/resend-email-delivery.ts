@@ -1,6 +1,11 @@
 import "server-only";
 import { z } from "zod";
-import { type EmailDelivery, EmailDeliveryError, type EmailMessage } from "./email-delivery";
+import {
+  type EmailDelivery,
+  EmailDeliveryError,
+  type EmailMessage,
+  type SendOptions,
+} from "./email-delivery";
 
 const SEND_URL = "https://api.resend.com/emails";
 const SEND_TIMEOUT_MS = 10_000;
@@ -20,7 +25,7 @@ const refusalSchema = z.object({ name: z.string().min(1) });
 export function createResendEmailDelivery(options: ResendEmailDeliveryOptions): EmailDelivery {
   const post = options.fetch ?? fetch;
   return {
-    async send(message: EmailMessage) {
+    async send(message: EmailMessage, sendOptions: SendOptions = {}) {
       let response: Response;
       try {
         response = await post(SEND_URL, {
@@ -28,6 +33,9 @@ export function createResendEmailDelivery(options: ResendEmailDeliveryOptions): 
           headers: {
             authorization: `Bearer ${options.apiKey}`,
             "content-type": "application/json",
+            ...(sendOptions.idempotencyKey === undefined
+              ? {}
+              : { "idempotency-key": sendOptions.idempotencyKey }),
           },
           body: JSON.stringify({
             from: options.from,

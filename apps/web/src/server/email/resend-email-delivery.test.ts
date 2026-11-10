@@ -63,6 +63,14 @@ describe("createResendEmailDelivery", () => {
     });
   });
 
+  it("passes an idempotency key on, so a retry cannot email twice", async () => {
+    const { calls, delivery } = deliveryAnswering(Response.json({ id: "email_1" }));
+
+    await delivery.send(message, { idempotencyKey: "email_abc" });
+
+    expect(new Headers(calls[0]?.init?.headers).get("idempotency-key")).toBe("email_abc");
+  });
+
   it("names Resend's condition when it refuses, without quoting its message", async () => {
     const { delivery } = deliveryAnswering(
       Response.json(
