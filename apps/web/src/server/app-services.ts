@@ -1,5 +1,6 @@
 import "server-only";
 import { createAuthService, type AuthService } from "./auth/auth-service";
+import { createCheckoutService, type CheckoutService } from "./checkout/checkout-service";
 import { serverConfig } from "./config";
 import { createDatabase } from "./database";
 import { createEmailDelivery } from "./email/create-email-delivery";
@@ -15,6 +16,7 @@ interface AppServices {
   auth: AuthService;
   payoutAddresses: PayoutAddressService;
   requests: RequestService;
+  checkout: CheckoutService;
 }
 
 declare global {
@@ -42,6 +44,7 @@ function appServices(): AppServices {
       auth: createAuthService({ database, emailDelivery, authSecret: config.authSecret }),
       payoutAddresses,
       requests: createRequestService({ database, useroutr, payoutAddresses }),
+      checkout: createCheckoutService({ database, useroutr }),
     };
   }
   return globalThis.pomiAppServices;
@@ -50,3 +53,4 @@ function appServices(): AppServices {
 export const authService = () => appServices().auth;
 export const payoutAddressService = () => appServices().payoutAddresses;
 export const requestService = () => appServices().requests;
+export const checkoutService = () => appServices().checkout;
