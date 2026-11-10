@@ -3,6 +3,7 @@ import { InvalidConfigurationError, parseServerConfig } from "./config";
 
 const valid = {
   DATABASE_URL: "postgresql://pomi:pomi@localhost:5432/pomi",
+  AUTH_SECRET: "a".repeat(32),
   USEROUTR_API_KEY: "ur_test_0123456789abcdef",
   USEROUTR_WEBHOOK_SECRET: "whsec_example",
 };
@@ -30,6 +31,9 @@ describe("parseServerConfig", () => {
     ["a missing webhook secret", { USEROUTR_WEBHOOK_SECRET: undefined }, "USEROUTR_WEBHOOK_SECRET"],
     ["an empty webhook secret", { USEROUTR_WEBHOOK_SECRET: "" }, "USEROUTR_WEBHOOK_SECRET"],
     ["a database that is not Postgres", { DATABASE_URL: "mysql://localhost/pomi" }, "DATABASE_URL"],
+    ["a missing auth secret", { AUTH_SECRET: undefined }, "AUTH_SECRET"],
+    ["a short auth secret", { AUTH_SECRET: "a".repeat(31) }, "AUTH_SECRET"],
+    ["an unknown email delivery", { EMAIL_DELIVERY: "smtp" }, "EMAIL_DELIVERY"],
   ])("refuses %s", (_case, override, variable) => {
     expect(() => parseServerConfig({ ...valid, ...override })).toThrow(
       new RegExp(`^Invalid server configuration: .*${variable}`),
@@ -45,5 +49,42 @@ describe("parseServerConfig", () => {
     expect(() => parseServerConfig({ ...valid, USEROUTR_API_KEY: secretKey })).not.toThrow(
       secretKey,
     );
+  });
+
+  it("sends email to the console by default, for local development", () => {
+    expect(parseServerConfig(valid).email).toEqual({ provider: "console" });
+  });
+
+  it("sends email through Resend when configured", () => {
+    const config = parseServerConfig({
+      ...valid,
+      EMAIL_DELIVERY: "resend",
+      RESEND_API_KEY: "re_example",
+      EMAIL_FROM: "Pomi <hello@pomi.app>",
+    });
+
+    expect(config.email).toEqual({
+      provider: "resend",
+      apiKey: "re_example",
+      from: "Pomi <hello@pomi.app>",
+    });
+  });
+
+  it.each([
+    ["an API key", { EMAIL_FROM: "Pomi <hello@pomi.app>" }, "RESEND_API_KEY"],
+    ["a sender", { RESEND_API_KEY: "re_example" }, "EMAIL_FROM"],
+  ])("refuses Resend without %s", (_case, override, variable) => {
+    expect(() => parseServerConfig({ ...valid, EMAIL_DELIVERY: "resend", ...override })).toThrow(
+      new RegExp(`^Invalid server configuration: .*${variable}`),
+    );
+  });
+
+  it("refuses console email in a production build, where codes would reach the logs", () => {
+    expect(() => parseServerConfig({ ...valid, NODE_ENV: "production" })).toThrow(
+      /EMAIL_DELIVERY: console delivery is for local development/,
+    );
+    expect(() =>
+      parseServerConfig({ ...valid, NODE_ENV: "production", EMAIL_DELIVERY: "console" }),
+    ).toThrow(/EMAIL_DELIVERY/);
   });
 });

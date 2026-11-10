@@ -44,3 +44,66 @@ body {
   color: var(--muted);
   font-size: 18px;
 }
+
+.panel {
+  display: grid;
+  max-width: 360px;
+  margin: 0 auto;
+  padding: 96px 16px;
+  gap: 16px;
+}
+
+.panel h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.form {
+  display: grid;
+  gap: 8px;
+}
+
+.form label {
+  font-weight: 600;
+}
+
+.form input,
+.panel button {
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.form input {
+  border: 1px solid var(--muted);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.panel button {
+  border: none;
+  background: var(--foreground);
+  color: var(--background);
+  cursor: pointer;
+}
+
+.panel button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.panel button.link {
+  background: none;
+  color: var(--muted);
+  text-decoration: underline;
+}
+
+.muted {
+  margin: 0;
+  color: var(--muted);
+}
+
+.error {
+  margin: 0;
+  color: #c62828;
+}

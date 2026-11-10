@@ -34,8 +34,12 @@ pnpm db:migrate
 pnpm --filter @pomi/web dev
 ```
 
-The web app runs on http://localhost:3000. A `ur_test_` Useroutr key works against the Useroutr
-sandbox, on the Stellar testnet.
+Before the last step, set `AUTH_SECRET` in `apps/web/.env` to the output of
+`openssl rand -base64 32`.
+
+The web app runs on http://localhost:3000. Sign in at `/sign-in`: locally, the code is printed in
+the terminal running the dev server instead of being emailed. A `ur_test_` Useroutr key works
+against the Useroutr sandbox, on the Stellar testnet.
 
 ```bash
 pnpm --filter @pomi/mobile start

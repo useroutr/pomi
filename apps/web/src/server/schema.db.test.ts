@@ -62,7 +62,7 @@ function createPayment(id: string, fundingIntentId: string) {
 }
 
 beforeEach(async () => {
-  await database.$executeRaw`TRUNCATE "users", "payout_addresses", "requests", "request_intents", "request_payments", "refunds", "webhook_events" CASCADE`;
+  await database.$executeRaw`TRUNCATE "users", "payout_addresses", "requests", "request_intents", "request_payments", "refunds", "webhook_events", "sign_in_codes", "sessions" CASCADE`;
   await createUser("usr_1");
 });
 
@@ -202,5 +202,60 @@ describe("receivers", () => {
         data: { id: "addr_3", userId: "usr_1", address: STELLAR_ACCOUNT },
       }),
     ).rejects.toThrow("payout_addresses_one_active_per_user");
+  });
+});
+
+describe("sign-in", () => {
+  function createSignInCode(id: string, email: string) {
+    const createdAt = new Date();
+    return database.signInCode.create({
+      data: {
+        id,
+        email,
+        codeHash: "hash",
+        expiresAt: new Date(createdAt.getTime() + 600_000),
+        createdAt,
+      },
+    });
+  }
+
+  function createSession(id: string, tokenHash: string) {
+    return database.session.create({
+      data: { id, userId: "usr_1", tokenHash, expiresAt: new Date(), createdAt: new Date() },
+    });
+  }
+
+  it("refuses a sign-in code for an address that is not lowercase", async () => {
+    await expect(createSignInCode("code_1", "Ada@Example.com")).rejects.toThrow(
+      "sign_in_codes_email_lowercase",
+    );
+  });
+
+  it("keeps several codes for one address, since only the newest counts", async () => {
+    await createSignInCode("code_1", "ada@example.com");
+
+    await expect(createSignInCode("code_2", "ada@example.com")).resolves.toMatchObject({
+      id: "code_2",
+    });
+  });
+
+  it("refuses two sessions with one token", async () => {
+    await createSession("ses_1", "token_hash");
+
+    await expect(createSession("ses_2", "token_hash")).rejects.toThrow("token_hash");
+  });
+
+  it("refuses a session for a receiver that does not exist", async () => {
+    await expect(
+      database.session.create({
+        data: {
+          id: "ses_1",
+          userId: "usr_missing",
+          tokenHash: "token_hash",
+          expiresAt: new Date(),
+          createdAt: new Date(),
+        },
+      }),
+    ).rejects.toThrow("sessions_user_id_fkey");
   });
 });
