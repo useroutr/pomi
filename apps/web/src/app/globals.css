@@ -2,6 +2,12 @@
   --background: #ffffff;
   --foreground: #111111;
   --muted: #555555;
+  --border: #e3e3e3;
+  --subtle: #f4f4f4;
+  --success-background: #e6f4ea;
+  --success-foreground: #1e6b34;
+  --warning-background: #fff4d6;
+  --warning-foreground: #6b4e00;
   color-scheme: light dark;
 }
 
@@ -10,6 +16,12 @@
     --background: #0d0d0d;
     --foreground: #f2f2f2;
     --muted: #a6a6a6;
+    --border: #2a2a2a;
+    --subtle: #1a1a1a;
+    --success-background: #12301c;
+    --success-foreground: #8fd6a4;
+    --warning-background: #332700;
+    --warning-foreground: #f2d27a;
   }
 }
 
@@ -43,6 +55,11 @@ body {
   margin: 0;
   color: var(--muted);
   font-size: 18px;
+}
+
+.hero-link {
+  margin-top: 16px;
+  color: var(--foreground);
 }
 
 .panel {
@@ -106,4 +123,195 @@ body {
 .error {
   margin: 0;
   color: #c62828;
+}
+
+.dashboard,
+.pay {
+  display: grid;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 32px 16px 64px;
+  gap: 16px;
+}
+
+.dashboard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dashboard-head h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.card h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.stack {
+  display: grid;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.grow {
+  flex: 1;
+}
+
+.small {
+  margin: 0;
+  font-size: 14px;
+}
+
+.center {
+  text-align: center;
+}
+
+.address {
+  margin: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.testnet {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--warning-background);
+  color: var(--warning-foreground);
+  font-size: 14px;
+}
+
+.form select,
+.dashboard button,
+.pay button,
+.button-link {
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.form select {
+  border: 1px solid var(--muted);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.dashboard button,
+.pay button {
+  border: none;
+  background: var(--foreground);
+  color: var(--background);
+  cursor: pointer;
+}
+
+.dashboard button:disabled,
+.pay button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.dashboard button.secondary,
+.button-link {
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.created {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--subtle);
+}
+
+.requests {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.request {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.request:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.request-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  background: var(--subtle);
+}
+
+.badge-paid {
+  background: var(--success-background);
+  color: var(--success-foreground);
+}
+
+.pay-amount {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 700;
+}
+
+.pay-amount span {
+  color: var(--muted);
+  font-size: 24px;
+}
+
+.pay-button {
+  font-size: 17px;
+  padding: 14px 16px;
+}
+
+.checkout {
+  display: grid;
 }
