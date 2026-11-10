@@ -7,11 +7,14 @@ import {
   createPayoutAddressService,
   type PayoutAddressService,
 } from "./payout-addresses/payout-address-service";
+import { createRequestService, type RequestService } from "./requests/request-service";
 import { createHorizonAccountReader } from "./stellar/horizon-account-reader";
+import { createUseroutrGateway } from "./useroutr/useroutr-gateway";
 
 interface AppServices {
   auth: AuthService;
   payoutAddresses: PayoutAddressService;
+  requests: RequestService;
 }
 
 declare global {
@@ -26,6 +29,10 @@ function appServices(): AppServices {
     const config = serverConfig();
     const database = createDatabase(config.databaseUrl);
     const emailDelivery = createEmailDelivery(config.email);
+    const useroutr = createUseroutrGateway({
+      apiKey: config.useroutr.apiKey,
+      webhookSecret: config.useroutr.webhookSecret,
+    });
     const payoutAddresses = createPayoutAddressService({
       database,
       accountReader: createHorizonAccountReader({ horizonUrl: config.stellar.horizonUrl }),
@@ -34,6 +41,7 @@ function appServices(): AppServices {
     globalThis.pomiAppServices = {
       auth: createAuthService({ database, emailDelivery, authSecret: config.authSecret }),
       payoutAddresses,
+      requests: createRequestService({ database, useroutr, payoutAddresses }),
     };
   }
   return globalThis.pomiAppServices;
@@ -41,3 +49,4 @@ function appServices(): AppServices {
 
 export const authService = () => appServices().auth;
 export const payoutAddressService = () => appServices().payoutAddresses;
+export const requestService = () => appServices().requests;
