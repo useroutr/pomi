@@ -26,6 +26,9 @@ const creditedIntentSchema = z.object({
   settlement: z
     .object({
       transaction_hash: z.string(),
+      // The payment out of the intent's deposit account to the receiver.
+      // transaction_hash is then the payer's own payment again.
+      transfer_transaction_hash: z.string().nullable(),
       destination: z.object({ amount: z.string().min(1) }),
     })
     .nullable(),
@@ -102,7 +105,10 @@ export function createWebhookService({
       amount: credited.settlement?.destination.amount ?? credited.requirement.amount,
       assetId: credited.requirement.asset,
       paymentTransactionHash: credited.payment?.transaction_hash ?? null,
-      settlementTransactionHash: credited.settlement?.transaction_hash ?? null,
+      settlementTransactionHash:
+        credited.settlement?.transfer_transaction_hash ??
+        credited.settlement?.transaction_hash ??
+        null,
       creditedAt,
     });
     await closeIntent(transaction, credited.id, now());

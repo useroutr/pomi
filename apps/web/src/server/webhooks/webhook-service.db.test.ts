@@ -15,7 +15,12 @@ const webhooks = createWebhookService({
   }),
 });
 
-function fundingEvent(eventId: string, type: string, fundingIntentId: string) {
+function fundingEvent(
+  eventId: string,
+  type: string,
+  fundingIntentId: string,
+  transferTransactionHash: string | null = "transfer_hash",
+) {
   return JSON.stringify({
     id: eventId,
     object: "event",
@@ -32,7 +37,13 @@ function fundingEvent(eventId: string, type: string, fundingIntentId: string) {
         payment: type === "funding.credited" ? { transaction_hash: "payment_hash" } : null,
         settlement:
           type === "funding.credited"
-            ? { transaction_hash: "settlement_hash", destination: { amount: "25" } }
+            ? {
+                // As Useroutr reports a deposit account payment: the payer's
+                // payment, then the transfer that paid the receiver.
+                transaction_hash: "payment_hash",
+                transfer_transaction_hash: transferTransactionHash,
+                destination: { amount: "25" },
+              }
             : null,
       },
     },
@@ -89,7 +100,7 @@ describe("funding.credited", () => {
       fundingIntentId: "fi_1",
       assetId: "asset_usdc_stellar",
       paymentTransactionHash: "payment_hash",
-      settlementTransactionHash: "settlement_hash",
+      settlementTransactionHash: "transfer_hash",
       creditedAt: new Date("2026-11-10T12:05:00.000Z"),
     });
     expect(payment.amount.toString()).toBe("25");
@@ -107,6 +118,14 @@ describe("funding.credited", () => {
       kind: "PAYMENT_RECEIVED",
       requestPaymentId: payment.id,
       sentAt: null,
+    });
+  });
+
+  it("keeps the settlement's own hash when there was no separate transfer", async () => {
+    await deliver(fundingEvent("evt_1", "funding.credited", "fi_1", null), "evt_1");
+
+    await expect(database.requestPayment.findFirstOrThrow()).resolves.toMatchObject({
+      settlementTransactionHash: "payment_hash",
     });
   });
 
