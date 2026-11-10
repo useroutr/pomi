@@ -25,6 +25,7 @@ function createRequest(id: string, overrides: Partial<Prisma.RequestUncheckedCre
       amountKind: "FIXED",
       amount: "25",
       assetId: "asset_usdc_stellar",
+      payoutAddressId: "addr_requests",
       ...overrides,
     },
   });
@@ -40,9 +41,9 @@ function createIntent(
       requestId: "req_1",
       fundingIntentId: `fi_${id}`,
       fundingToken: `token_${id}`,
-      visitId: `visit_${id}`,
       amount: "25",
       exclusive: true,
+      expiresAt: new Date(Date.now() + 30 * 60_000),
       ...overrides,
     },
   });
@@ -62,8 +63,12 @@ function createPayment(id: string, fundingIntentId: string) {
 }
 
 beforeEach(async () => {
-  await database.$executeRaw`TRUNCATE "users", "payout_addresses", "requests", "request_intents", "request_payments", "refunds", "webhook_events", "sign_in_codes", "sessions" CASCADE`;
+  await database.$executeRaw`TRUNCATE "users", "payout_addresses", "requests", "request_intents", "request_payments", "outbox_emails", "refunds", "webhook_events", "sign_in_codes", "sessions" CASCADE`;
   await createUser("usr_1");
+  // Inactive, so the tests of the one active address start from none.
+  await database.payoutAddress.create({
+    data: { id: "addr_requests", userId: "usr_1", address: STELLAR_ACCOUNT, active: false },
+  });
 });
 
 afterAll(async () => {
@@ -77,6 +82,21 @@ describe("payments", () => {
 
     await expect(createPayment("pay_2", "fi_1")).rejects.toThrow("funding_intent_id");
     expect(await database.requestPayment.count()).toBe(1);
+  });
+
+  it("emails about a payment once, however often its webhook arrives", async () => {
+    await createRequest("req_1");
+    await createPayment("pay_1", "fi_1");
+    const email = {
+      kind: "PAYMENT_RECEIVED",
+      requestPaymentId: "pay_1",
+      createdAt: new Date(),
+    } as const;
+    await database.outboxEmail.create({ data: { id: "email_1", ...email } });
+
+    await expect(
+      database.outboxEmail.create({ data: { id: "email_2", ...email } }),
+    ).rejects.toThrow("kind");
   });
 
   it("processes a webhook event once", async () => {
@@ -101,13 +121,27 @@ describe("funding intents", () => {
 
   it("gives a reusable request one intent per visit", async () => {
     await createRequest("req_1", { kind: "REUSABLE" });
-    await createIntent("int_1", { exclusive: false });
-    await createIntent("int_2", { exclusive: false });
+    await createIntent("int_1", { exclusive: false, visitId: "visit_1" });
+    await createIntent("int_2", { exclusive: false, visitId: "visit_2" });
 
-    await expect(
-      createIntent("int_3", { exclusive: false, visitId: "visit_int_1" }),
-    ).rejects.toThrow("visit_id");
+    await expect(createIntent("int_3", { exclusive: false, visitId: "visit_1" })).rejects.toThrow(
+      "visit_id",
+    );
   });
+
+  it.each([
+    ["a shared intent tied to one visit", { exclusive: true, visitId: "visit_1" }],
+    ["a per-visit intent without its visit", { exclusive: false, visitId: null }],
+  ] satisfies [string, Partial<Prisma.RequestIntentUncheckedCreateInput>][])(
+    "refuses %s",
+    async (_case, overrides) => {
+      await createRequest("req_1", { kind: "REUSABLE" });
+
+      await expect(createIntent("int_1", overrides)).rejects.toThrow(
+        "request_intents_visit_matches_kind",
+      );
+    },
+  );
 
   it("refuses an intent for nothing", async () => {
     await createRequest("req_1");
@@ -144,6 +178,12 @@ describe("requests", () => {
       await expect(createRequest("req_1", overrides)).rejects.toThrow(constraint);
     },
   );
+
+  it("refuses a request without a payout address", async () => {
+    await expect(createRequest("req_1", { payoutAddressId: "addr_missing" })).rejects.toThrow(
+      "requests_payout_address_id_fkey",
+    );
+  });
 
   it("accepts a pay box for the payer's choice of amount, above a minimum", async () => {
     await expect(
