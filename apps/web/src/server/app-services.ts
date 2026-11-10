@@ -1,12 +1,17 @@
 import "server-only";
 import { createAuthService, type AuthService } from "./auth/auth-service";
 import { serverConfig } from "./config";
-import { createDatabase, type Database } from "./database";
+import { createDatabase } from "./database";
 import { createEmailDelivery } from "./email/create-email-delivery";
+import {
+  createPayoutAddressService,
+  type PayoutAddressService,
+} from "./payout-addresses/payout-address-service";
+import { createHorizonAccountReader } from "./stellar/horizon-account-reader";
 
 interface AppServices {
-  database: Database;
   auth: AuthService;
+  payoutAddresses: PayoutAddressService;
 }
 
 declare global {
@@ -20,18 +25,19 @@ function appServices(): AppServices {
   if (globalThis.pomiAppServices === undefined) {
     const config = serverConfig();
     const database = createDatabase(config.databaseUrl);
-    globalThis.pomiAppServices = {
+    const emailDelivery = createEmailDelivery(config.email);
+    const payoutAddresses = createPayoutAddressService({
       database,
-      auth: createAuthService({
-        database,
-        emailDelivery: createEmailDelivery(config.email),
-        authSecret: config.authSecret,
-      }),
+      accountReader: createHorizonAccountReader({ horizonUrl: config.stellar.horizonUrl }),
+      network: config.stellar.network,
+    });
+    globalThis.pomiAppServices = {
+      auth: createAuthService({ database, emailDelivery, authSecret: config.authSecret }),
+      payoutAddresses,
     };
   }
   return globalThis.pomiAppServices;
 }
 
-export function authService(): AuthService {
-  return appServices().auth;
-}
+export const authService = () => appServices().auth;
+export const payoutAddressService = () => appServices().payoutAddresses;

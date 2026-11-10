@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { NotSignedInError } from "../auth/signed-in-user";
 import { InvalidRequestBodyError, UnsupportedContentTypeError } from "./json-request";
 
 export type ErrorCode =
@@ -7,7 +8,22 @@ export type ErrorCode =
   | "invalid_email"
   | "invalid_code"
   | "rate_limited"
-  | "email_unavailable";
+  | "email_unavailable"
+  | "not_signed_in"
+  | "invalid_address"
+  | "account_missing"
+  | "memo_required"
+  | "asset_not_trusted"
+  | "payout_address_required"
+  | "invalid_amount"
+  | "invalid_note"
+  | "unsupported_asset"
+  | "not_found"
+  | "request_paid"
+  | "request_closed"
+  | "destination_refused"
+  | "stellar_unavailable"
+  | "useroutr_unavailable";
 
 export interface ErrorBody {
   error: { code: ErrorCode; message: string };
@@ -31,5 +47,12 @@ export function requestErrorResponse(error: unknown): NextResponse<ErrorBody> | 
   if (error instanceof InvalidRequestBodyError) {
     return errorResponse(400, "invalid_request", error.message);
   }
+  if (error instanceof NotSignedInError) {
+    return errorResponse(401, "not_signed_in", error.message);
+  }
   return undefined;
+}
+
+export function rethrow(error: unknown): never {
+  throw error;
 }

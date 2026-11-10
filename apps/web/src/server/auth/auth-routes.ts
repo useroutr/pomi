@@ -2,7 +2,7 @@ import "server-only";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { EmailDeliveryError } from "../email/email-delivery";
-import { errorResponse, requestErrorResponse } from "../http/error-response";
+import { errorResponse, requestErrorResponse, rethrow } from "../http/error-response";
 import { readJsonBody } from "../http/json-request";
 import {
   InvalidEmailAddressError,
@@ -77,8 +77,4 @@ export async function handleSignOut(
   const response = new NextResponse(null, { status: 204 });
   response.cookies.delete(SESSION_COOKIE);
   return response;
-}
-
-function rethrow(error: unknown): never {
-  throw error;
 }
