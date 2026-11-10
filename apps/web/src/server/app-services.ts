@@ -37,6 +37,7 @@ function appServices(): AppServices {
     const emailDelivery = createEmailDelivery(config.email);
     const useroutr = createUseroutrGateway({
       apiKey: config.useroutr.apiKey,
+      apiUrl: config.useroutr.apiUrl,
       webhookSecret: config.useroutr.webhookSecret,
     });
     const payoutAddresses = createPayoutAddressService({

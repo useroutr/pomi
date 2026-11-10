@@ -28,6 +28,7 @@ function gatewayAnswering(answers: Response[]) {
   const sleeps: number[] = [];
   const gateway = createUseroutrGateway({
     apiKey: "ur_test_key",
+    apiUrl: "https://api.sandbox.useroutr.com",
     webhookSecret: WEBHOOK_SECRET,
     client,
     sleep: (milliseconds) => {

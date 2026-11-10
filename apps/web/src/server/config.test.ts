@@ -139,4 +139,12 @@ describe("parseServerConfig", () => {
     expect(config.walletConnectProjectId).toBe("project_1");
     expect(config.cronSecret).toBe("c".repeat(32));
   });
+
+  it("points at a local Useroutr when one is given", () => {
+    const config = parseServerConfig({ ...valid, USEROUTR_API_URL: "http://localhost:4000/" });
+
+    expect(config.useroutr.apiUrl).toBe("http://localhost:4000");
+    expect(config.useroutr.publicApiUrl).toBe("http://localhost:4000/v1/public");
+    expect(config.stellar.network).toBe("testnet");
+  });
 });

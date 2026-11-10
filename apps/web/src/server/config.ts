@@ -18,6 +18,7 @@ export interface ServerConfig {
   useroutr: {
     apiKey: string;
     environment: UseroutrEnvironment;
+    apiUrl: string;
     // Where the embedded checkout, running in the payer's browser, calls
     // Useroutr's public endpoints. It needs no key.
     publicApiUrl: string;
@@ -72,6 +73,9 @@ const environmentSchema = z
       .string()
       .regex(/^ur_(test|live)_./, "must be a Useroutr application key (ur_test_ or ur_live_)"),
     USEROUTR_WEBHOOK_SECRET: z.string().min(1),
+    // Only to develop against a Useroutr running locally. Deployed, the key
+    // alone decides the API.
+    USEROUTR_API_URL: z.url({ protocol: /^https?$/ }).optional(),
   })
   .and(emailDeliverySchema)
   .superRefine((variables, context) => {
@@ -111,7 +115,10 @@ export function parseServerConfig(environment: Record<string, string | undefined
   const useroutrEnvironment: UseroutrEnvironment = variables.USEROUTR_API_KEY.startsWith("ur_live_")
     ? "production"
     : "sandbox";
-  const apiBaseUrl = useroutrEnvironment === "production" ? DEFAULT_BASE_URL : SANDBOX_BASE_URL;
+  const apiBaseUrl = (
+    variables.USEROUTR_API_URL ??
+    (useroutrEnvironment === "production" ? DEFAULT_BASE_URL : SANDBOX_BASE_URL)
+  ).replace(/\/+$/, "");
   const stellarNetwork: StellarNetwork =
     useroutrEnvironment === "production" ? "mainnet" : "testnet";
   return {
@@ -122,6 +129,7 @@ export function parseServerConfig(environment: Record<string, string | undefined
     useroutr: {
       apiKey: variables.USEROUTR_API_KEY,
       environment: useroutrEnvironment,
+      apiUrl: apiBaseUrl,
       publicApiUrl: `${apiBaseUrl}/v1/public`,
       webhookSecret: variables.USEROUTR_WEBHOOK_SECRET,
     },

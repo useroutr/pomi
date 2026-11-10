@@ -8,7 +8,11 @@ import { createWebhookService } from "./webhook-service";
 const database = testDatabase();
 const webhooks = createWebhookService({
   database,
-  useroutr: createUseroutrGateway({ apiKey: "ur_test_key", webhookSecret: WEBHOOK_SECRET }),
+  useroutr: createUseroutrGateway({
+    apiKey: "ur_test_key",
+    apiUrl: "https://api.sandbox.useroutr.com",
+    webhookSecret: WEBHOOK_SECRET,
+  }),
 });
 
 function fundingEvent(eventId: string, type: string, fundingIntentId: string) {

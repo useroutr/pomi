@@ -57,6 +57,7 @@ export class UseroutrResponseError extends Error {
 
 export interface UseroutrGatewayOptions {
   apiKey: string;
+  apiUrl: string;
   webhookSecret: string;
   // For tests: a client with a stubbed transport.
   client?: Useroutr;
@@ -68,8 +69,8 @@ const IN_PROGRESS_RETRIES = 5;
 const IN_PROGRESS_DELAY_MS = 300;
 
 export function createUseroutrGateway(options: UseroutrGatewayOptions): UseroutrGateway {
-  // The SDK picks the sandbox or production API from the key.
-  const client = options.client ?? new Useroutr({ apiKey: options.apiKey });
+  const client =
+    options.client ?? new Useroutr({ apiKey: options.apiKey, baseUrl: options.apiUrl });
   const sleep =
     options.sleep ??
     ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
