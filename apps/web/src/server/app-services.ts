@@ -4,6 +4,7 @@ import { createCheckoutService, type CheckoutService } from "./checkout/checkout
 import { serverConfig } from "./config";
 import { createDatabase } from "./database";
 import { createEmailDelivery } from "./email/create-email-delivery";
+import { createOutboxSender, type OutboxSender } from "./notifications/outbox-sender";
 import {
   createPayoutAddressService,
   type PayoutAddressService,
@@ -11,12 +12,15 @@ import {
 import { createRequestService, type RequestService } from "./requests/request-service";
 import { createHorizonAccountReader } from "./stellar/horizon-account-reader";
 import { createUseroutrGateway } from "./useroutr/useroutr-gateway";
+import { createWebhookService, type WebhookService } from "./webhooks/webhook-service";
 
 interface AppServices {
   auth: AuthService;
   payoutAddresses: PayoutAddressService;
   requests: RequestService;
   checkout: CheckoutService;
+  webhooks: WebhookService;
+  outbox: OutboxSender;
 }
 
 declare global {
@@ -45,6 +49,14 @@ function appServices(): AppServices {
       payoutAddresses,
       requests: createRequestService({ database, useroutr, payoutAddresses }),
       checkout: createCheckoutService({ database, useroutr }),
+      webhooks: createWebhookService({ database, useroutr }),
+      outbox: createOutboxSender({
+        database,
+        emailDelivery,
+        useroutr,
+        appUrl: config.appUrl,
+        network: config.stellar.network,
+      }),
     };
   }
   return globalThis.pomiAppServices;
@@ -54,3 +66,5 @@ export const authService = () => appServices().auth;
 export const payoutAddressService = () => appServices().payoutAddresses;
 export const requestService = () => appServices().requests;
 export const checkoutService = () => appServices().checkout;
+export const webhookService = () => appServices().webhooks;
+export const outboxSender = () => appServices().outbox;
