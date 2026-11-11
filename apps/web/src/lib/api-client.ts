@@ -8,7 +8,7 @@ export type ApiResult = { ok: true; body: unknown } | { ok: false; message: stri
 // message written to be shown to the person as it is.
 export async function callApi(
   path: string,
-  init: { method: "GET" | "POST" | "PUT"; body?: unknown },
+  init: { method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown },
 ): Promise<ApiResult> {
   let response: Response;
   try {
