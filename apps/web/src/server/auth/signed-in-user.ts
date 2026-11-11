@@ -10,11 +10,20 @@ export class NotSignedInError extends Error {
   }
 }
 
+// The web holds the session in its cookie; the mobile app sends the same
+// kind of token as a bearer token. A page on another site can make a
+// browser send the cookie, never the header.
+export function sessionToken(request: NextRequest): string | undefined {
+  const authorization = request.headers.get("authorization");
+  const bearer = authorization?.match(/^Bearer ([\w-]+)$/)?.[1];
+  return bearer ?? request.cookies.get(SESSION_COOKIE)?.value;
+}
+
 export async function signedInUser(
   request: NextRequest,
   authService: Pick<AuthService, "resolveSession">,
 ): Promise<SignedInUser> {
-  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  const token = sessionToken(request);
   const user = token === undefined ? null : await authService.resolveSession(token);
   if (user === null) {
     throw new NotSignedInError();
