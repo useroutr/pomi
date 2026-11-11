@@ -6,14 +6,12 @@ import { createUseroutrGateway } from "../useroutr/useroutr-gateway";
 import { createWebhookService } from "./webhook-service";
 
 const database = testDatabase();
-const webhooks = createWebhookService({
-  database,
-  useroutr: createUseroutrGateway({
-    apiKey: "ur_test_key",
-    apiUrl: "https://api.sandbox.useroutr.com",
-    webhookSecret: WEBHOOK_SECRET,
-  }),
+const gateway = createUseroutrGateway({
+  apiKey: "ur_test_key",
+  apiUrl: "https://api.sandbox.useroutr.com",
+  webhookSecret: WEBHOOK_SECRET,
 });
+const webhooks = createWebhookService({ database, useroutr: gateway, alertsOperator: true });
 
 function fundingEvent(
   eventId: string,
@@ -119,6 +117,27 @@ describe("funding.credited", () => {
       requestPaymentId: payment.id,
       sentAt: null,
     });
+    await expect(database.outboxPush.findFirstOrThrow()).resolves.toMatchObject({
+      requestPaymentId: payment.id,
+      sentAt: null,
+    });
+  });
+
+  it("keeps a reusable request open for its next payment", async () => {
+    await database.request.update({ where: { id: "req_1" }, data: { kind: "REUSABLE" } });
+    await database.requestIntent.update({
+      where: { id: "int_1" },
+      data: { exclusive: false, visitId: "vis_1:0", visitorId: "vis_1" },
+    });
+
+    await deliver(fundingEvent("evt_1", "funding.credited", "fi_1"), "evt_1");
+
+    expect(await database.requestPayment.count()).toBe(1);
+    await expect(
+      database.request.findUniqueOrThrow({ where: { id: "req_1" } }),
+    ).resolves.toMatchObject({
+      status: "OPEN",
+    });
   });
 
   it("keeps the settlement's own hash when there was no separate transfer", async () => {
@@ -137,6 +156,7 @@ describe("funding.credited", () => {
 
     expect(await database.requestPayment.count()).toBe(1);
     expect(await database.outboxEmail.count()).toBe(1);
+    expect(await database.outboxPush.count()).toBe(1);
   });
 
   it("records one payment when two copies arrive at the same moment", async () => {
@@ -210,6 +230,60 @@ describe("other events", () => {
 
     expect(await database.webhookEvent.count()).toBe(1);
     expect(await database.requestPayment.count()).toBe(0);
+  });
+});
+
+describe("refunds", () => {
+  function refundEvent(eventId: string, type: string, status = "PENDING") {
+    return JSON.stringify({
+      id: eventId,
+      object: "event",
+      api_version: "1",
+      application_id: "app_1",
+      funding_intent_id: "fi_1",
+      type,
+      created_at: "2026-11-10T12:10:00.000Z",
+      data: { object: { id: "ref_1", funding_intent_id: "fi_1", status } },
+    });
+  }
+
+  it("records a refund that needs a destination and alerts the operator once", async () => {
+    await deliver(refundEvent("evt_1", "refund.destination_required"), "evt_1");
+    await deliver(refundEvent("evt_2", "refund.destination_required"), "evt_2");
+
+    await expect(
+      database.refund.findUniqueOrThrow({ where: { id: "ref_1" } }),
+    ).resolves.toMatchObject({
+      fundingIntentId: "fi_1",
+      status: "PENDING",
+      destinationRequiredAt: new Date("2026-11-10T12:10:00.000Z"),
+    });
+    await expect(database.outboxEmail.findMany()).resolves.toMatchObject([
+      { kind: "REFUND_DESTINATION_REQUIRED", refundId: "ref_1", requestPaymentId: null },
+    ]);
+  });
+
+  it("follows a refund's status as it completes", async () => {
+    await deliver(refundEvent("evt_1", "refund.created"), "evt_1");
+    await deliver(refundEvent("evt_2", "refund.completed", "COMPLETED"), "evt_2");
+
+    await expect(
+      database.refund.findUniqueOrThrow({ where: { id: "ref_1" } }),
+    ).resolves.toMatchObject({
+      status: "COMPLETED",
+      destinationRequiredAt: null,
+    });
+    expect(await database.outboxEmail.count()).toBe(0);
+  });
+
+  it("records the refund but emails no one when no operator is set", async () => {
+    const quiet = createWebhookService({ database, useroutr: gateway, alertsOperator: false });
+    const payload = refundEvent("evt_1", "refund.destination_required");
+
+    await quiet.handleDelivery(payload, signWebhook(payload, "evt_1"), "evt_1");
+
+    expect(await database.refund.count()).toBe(1);
+    expect(await database.outboxEmail.count()).toBe(0);
   });
 });
 

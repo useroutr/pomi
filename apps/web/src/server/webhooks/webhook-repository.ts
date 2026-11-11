@@ -41,18 +41,60 @@ export async function insertPayment(
   await client.requestPayment.create({ data: payment });
 }
 
-// A closed request that is paid anyway keeps its status: the receiver
-// closed it, and the payment is still recorded beside it.
-export async function markRequestPaid(client: Prisma.TransactionClient, requestId: string) {
+// Only a single-use request is done after one payment; a reusable one stays
+// open. A closed request that is paid anyway keeps its status, and the
+// payment is still recorded beside it.
+export async function markSingleRequestPaid(client: Prisma.TransactionClient, requestId: string) {
   await client.request.updateMany({
-    where: { id: requestId, status: "OPEN" },
+    where: { id: requestId, kind: "SINGLE", status: "OPEN" },
     data: { status: "PAID" },
   });
 }
 
-export async function queuePaymentEmail(
+export async function queuePaymentNotices(
   client: Prisma.TransactionClient,
-  email: { id: string; requestPaymentId: string; createdAt: Date },
+  notice: { requestPaymentId: string; emailId: string; pushId: string; createdAt: Date },
 ) {
-  await client.outboxEmail.create({ data: { ...email, kind: "PAYMENT_RECEIVED" } });
+  await client.outboxEmail.create({
+    data: {
+      id: notice.emailId,
+      kind: "PAYMENT_RECEIVED",
+      requestPaymentId: notice.requestPaymentId,
+      createdAt: notice.createdAt,
+    },
+  });
+  await client.outboxPush.create({
+    data: {
+      id: notice.pushId,
+      requestPaymentId: notice.requestPaymentId,
+      createdAt: notice.createdAt,
+    },
+  });
+}
+
+export async function upsertRefund(
+  client: Prisma.TransactionClient,
+  refund: { id: string; fundingIntentId: string; status: string; destinationRequiredAt?: Date },
+) {
+  await client.refund.upsert({
+    where: { id: refund.id },
+    create: refund,
+    update: {
+      status: refund.status,
+      ...(refund.destinationRequiredAt === undefined
+        ? {}
+        : { destinationRequiredAt: refund.destinationRequiredAt }),
+    },
+  });
+}
+
+// One alert per refund, however often Useroutr asks.
+export async function queueRefundAlert(
+  client: Prisma.TransactionClient,
+  alert: { id: string; refundId: string; createdAt: Date },
+) {
+  await client.outboxEmail.createMany({
+    data: [{ ...alert, kind: "REFUND_DESTINATION_REQUIRED" }],
+    skipDuplicates: true,
+  });
 }

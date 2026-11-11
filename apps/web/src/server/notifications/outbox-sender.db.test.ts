@@ -7,17 +7,28 @@ import {
   type EmailMessage,
   type SendOptions,
 } from "../email/email-delivery";
+import {
+  type PushDelivery,
+  PushDeliveryError,
+  type PushMessage,
+  type PushOutcome,
+} from "../push/push-delivery";
 import { createOutboxSender, OutboxDeliveryError } from "./outbox-sender";
 
 const database = testDatabase();
+const IPHONE = "ExponentPushToken[iphone]";
+const OLD_PHONE = "ExponentPushToken[old-phone]";
 
 let currentTime: Date;
 let sent: { message: EmailMessage; options: SendOptions | undefined }[];
-let failing: boolean;
+let pushed: PushMessage[];
+let emailFailing: boolean;
+let pushFailing: boolean;
+let unregistered: Set<string>;
 
-const delivery: EmailDelivery = {
+const emailDelivery: EmailDelivery = {
   send(message, options) {
-    if (failing) {
+    if (emailFailing) {
       return Promise.reject(new EmailDeliveryError("Resend could not be reached"));
     }
     sent.push({ message, options });
@@ -25,18 +36,34 @@ const delivery: EmailDelivery = {
   },
 };
 
-function sender() {
+const pushDelivery: PushDelivery = {
+  send(messages) {
+    if (pushFailing) {
+      return Promise.reject(new PushDeliveryError("Expo could not be reached"));
+    }
+    pushed.push(...messages);
+    return Promise.resolve(
+      messages.map((message): PushOutcome =>
+        unregistered.has(message.to) ? "unregistered" : "sent",
+      ),
+    );
+  },
+};
+
+function sender(operatorEmail: string | null = "ops@pomi.app") {
   return createOutboxSender({
     database,
-    emailDelivery: delivery,
+    emailDelivery,
+    pushDelivery,
     useroutr: new FakeUseroutr(),
     appUrl: "https://pomi.app",
     network: "testnet",
+    operatorEmail,
     now: () => currentTime,
   });
 }
 
-async function queuePayment(paymentId: string, emailId: string) {
+async function queuePayment(paymentId: string, emailId: string, pushId?: string) {
   await database.requestPayment.create({
     data: {
       id: paymentId,
@@ -56,13 +83,21 @@ async function queuePayment(paymentId: string, emailId: string) {
       createdAt: currentTime,
     },
   });
+  if (pushId !== undefined) {
+    await database.outboxPush.create({
+      data: { id: pushId, requestPaymentId: paymentId, createdAt: currentTime },
+    });
+  }
 }
 
 beforeEach(async () => {
   await emptyTables(database);
   currentTime = new Date("2026-11-10T12:00:00Z");
   sent = [];
-  failing = false;
+  pushed = [];
+  emailFailing = false;
+  pushFailing = false;
+  unregistered = new Set();
   await database.user.create({ data: { id: "usr_1", email: "receiver@example.com" } });
   await database.payoutAddress.create({
     data: { id: "addr_1", userId: "usr_1", address: RECEIVER_ACCOUNT },
@@ -85,12 +120,12 @@ afterAll(async () => {
   await database.$disconnect();
 });
 
-describe("sending the outbox", () => {
+describe("emails", () => {
   it("emails the receiver once, keyed by the outbox row", async () => {
     await queuePayment("pay_1", "email_1");
 
-    await expect(sender().sendPending()).resolves.toEqual({ sent: 1 });
-    await expect(sender().sendPending()).resolves.toEqual({ sent: 0 });
+    await expect(sender().sendPending()).resolves.toEqual({ emailsSent: 1, pushesSent: 0 });
+    await expect(sender().sendPending()).resolves.toEqual({ emailsSent: 0, pushesSent: 0 });
 
     expect(sent).toHaveLength(1);
     expect(sent[0]?.message).toMatchObject({
@@ -111,13 +146,13 @@ describe("sending the outbox", () => {
 
   it("keeps a failed email and tries it again once its claim lapses", async () => {
     await queuePayment("pay_1", "email_1");
-    failing = true;
+    emailFailing = true;
 
     await expect(sender().sendPending()).rejects.toThrow(OutboxDeliveryError);
-    failing = false;
-    await expect(sender().sendPending()).resolves.toEqual({ sent: 0 });
+    emailFailing = false;
+    await expect(sender().sendPending()).resolves.toMatchObject({ emailsSent: 0 });
     currentTime = new Date(currentTime.getTime() + 3 * 60_000);
-    await expect(sender().sendPending()).resolves.toEqual({ sent: 1 });
+    await expect(sender().sendPending()).resolves.toMatchObject({ emailsSent: 1 });
 
     await expect(
       database.outboxEmail.findUniqueOrThrow({ where: { id: "email_1" } }),
@@ -133,7 +168,7 @@ describe("sending the outbox", () => {
 
     const results = await Promise.all([sender().sendPending(), sender().sendPending()]);
 
-    expect(results.reduce((total, result) => total + result.sent, 0)).toBe(3);
+    expect(results.reduce((total, result) => total + result.emailsSent, 0)).toBe(3);
     expect(sent.map((email) => email.options?.idempotencyKey).sort()).toEqual([
       "email_1",
       "email_2",
@@ -145,6 +180,91 @@ describe("sending the outbox", () => {
     await queuePayment("pay_1", "email_1");
     await database.outboxEmail.update({ where: { id: "email_1" }, data: { attempts: 8 } });
 
-    await expect(sender().sendPending()).resolves.toEqual({ sent: 0 });
+    await expect(sender().sendPending()).resolves.toMatchObject({ emailsSent: 0 });
+  });
+
+  it("tells the operator which refund needs a destination", async () => {
+    await database.refund.create({
+      data: {
+        id: "ref_1",
+        fundingIntentId: "fi_1",
+        status: "PENDING",
+        destinationRequiredAt: currentTime,
+      },
+    });
+    await database.outboxEmail.create({
+      data: {
+        id: "email_r",
+        kind: "REFUND_DESTINATION_REQUIRED",
+        refundId: "ref_1",
+        createdAt: currentTime,
+      },
+    });
+
+    await sender().sendPending();
+
+    expect(sent[0]?.message.to).toBe("ops@pomi.app");
+    expect(sent[0]?.message.text).toContain("ref_1");
+    expect(sent[0]?.message.text).toContain("fi_1");
+  });
+});
+
+describe("push notifications", () => {
+  async function registerDevice(id: string, pushToken: string) {
+    await database.device.create({
+      data: { id, userId: "usr_1", pushToken, platform: "IOS", createdAt: currentTime },
+    });
+  }
+
+  it("notifies every device the receiver registered, once", async () => {
+    await registerDevice("dev_1", IPHONE);
+    await registerDevice("dev_2", OLD_PHONE);
+    await queuePayment("pay_1", "email_1", "push_1");
+
+    await expect(sender().sendPending()).resolves.toEqual({ emailsSent: 1, pushesSent: 1 });
+    await sender().sendPending();
+
+    expect(pushed.map((message) => message.to).sort()).toEqual([IPHONE, OLD_PHONE]);
+    expect(pushed[0]).toMatchObject({
+      title: "You were paid 25 USDC",
+      body: "Logo design",
+      data: { requestId: "req_1" },
+    });
+  });
+
+  it("forgets a device Expo no longer knows", async () => {
+    await registerDevice("dev_1", IPHONE);
+    await registerDevice("dev_2", OLD_PHONE);
+    unregistered.add(OLD_PHONE);
+    await queuePayment("pay_1", "email_1", "push_1");
+
+    await sender().sendPending();
+
+    await expect(database.device.findMany({ select: { pushToken: true } })).resolves.toEqual([
+      { pushToken: IPHONE },
+    ]);
+  });
+
+  it("marks a push sent when the receiver has no devices", async () => {
+    await queuePayment("pay_1", "email_1", "push_1");
+
+    await expect(sender().sendPending()).resolves.toMatchObject({ pushesSent: 1 });
+    expect(pushed).toHaveLength(0);
+  });
+
+  it("retries a push when Expo cannot be reached, and still sends the email", async () => {
+    await registerDevice("dev_1", IPHONE);
+    await queuePayment("pay_1", "email_1", "push_1");
+    pushFailing = true;
+
+    await expect(sender().sendPending()).rejects.toThrow(OutboxDeliveryError);
+
+    expect(sent).toHaveLength(1);
+    await expect(
+      database.outboxPush.findUniqueOrThrow({ where: { id: "push_1" } }),
+    ).resolves.toMatchObject({
+      sentAt: null,
+      attempts: 1,
+    });
   });
 });
