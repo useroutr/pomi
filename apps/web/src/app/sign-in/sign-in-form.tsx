@@ -2,9 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { type SubmitEvent, useState } from "react";
-import { z } from "zod";
-
-const errorBodySchema = z.object({ error: z.object({ message: z.string() }) });
+import { callApi } from "@/lib/api-client";
 
 type Step = { name: "email" } | { name: "code"; email: string };
 
@@ -19,23 +17,12 @@ export function SignInForm() {
   async function submit(path: string, body: Record<string, string>): Promise<boolean> {
     setPending(true);
     setError(null);
-    try {
-      const response = await fetch(path, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (response.ok) {
-        return true;
-      }
-      setError(await errorMessage(response));
-      return false;
-    } catch {
-      setError("Pomi could not be reached. Check your connection and try again.");
-      return false;
-    } finally {
-      setPending(false);
+    const result = await callApi(path, { method: "POST", body });
+    setPending(false);
+    if (!result.ok) {
+      setError(result.message);
     }
+    return result.ok;
   }
 
   async function requestCode(event: SubmitEvent<HTMLFormElement>) {
@@ -112,16 +99,4 @@ export function SignInForm() {
       </button>
     </form>
   );
-}
-
-async function errorMessage(response: Response): Promise<string> {
-  try {
-    const parsed = errorBodySchema.safeParse(await response.json());
-    if (parsed.success) {
-      return parsed.data.error.message;
-    }
-  } catch {
-    // Not JSON: fall through to the generic message.
-  }
-  return "Something went wrong. Try again.";
 }

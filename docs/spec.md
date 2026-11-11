@@ -70,7 +70,7 @@ The whole app is **one Useroutr application** with one API key, held by its back
 | App concept | Useroutr |
 |---|---|
 | A request | The app's own record. Useroutr knows nothing of it. |
-| A payer opening a request | A funding intent. `destination` is the receiver's address and asset, `reference` is the request id, `metadata` carries the request and visit, and the idempotency key is the visit id. |
+| A payer opening a request | A funding intent. `destination` is the receiver's address and asset, and `reference` is the request id. For a single-use request the idempotency key is the request id and the intent's number (`pomi:<request>:<n>`), so visitors arriving together send the same key and get the same intent. For a reusable request it will be the visit id. |
 | Paid | `funding.credited` for that intent |
 | Partly paid, expired, failed | `funding.partially_funded`, `funding.expired`, `funding.failed` |
 | A payment that cannot complete the request | `payment.rejected` and `refund.*` events. Useroutr refunds the payer by its own rules, and sends `refund.destination_required` when it cannot tell where the money should go (section 9). |
@@ -79,9 +79,12 @@ The whole app is **one Useroutr application** with one API key, held by its back
 default). A request can stay open for weeks, so the app creates an intent when a payer arrives,
 as Stripe Payment Links do:
 - **Single-use request.** At most one live intent at a time, shared by every visitor. A second
-  visitor resumes the same checkout. If two people pay anyway, the second payment is an
-  overpayment or a duplicate, which Useroutr refunds to that payer. Once one intent is credited,
-  the request closes and no new intent is created.
+  visitor resumes the same checkout. A new intent starts only after the last one has expired
+  and Useroutr reports that it took no payment, so two payable intents never exist at once. If
+  two people pay anyway, the second payment is an overpayment or a duplicate, which Useroutr
+  refunds to that payer. Once one intent is credited, the request is paid and no new intent is
+  created. The checkout starts when the payer presses Pay, never when the page loads, so link
+  previews and crawlers create no intents.
 - **Reusable request**, including the pay box on a handle page. Each visit creates its own
   intent, and each credited intent is one payment on the request. When the payer chooses the
   amount, the backend checks it (`parseRequestAmount`, then the minimum) and the intent asks for
@@ -166,13 +169,18 @@ Paying by hand works everywhere, so any payer can always pay.
   the app's own routes use (`r`, `api`, `dashboard`, `settings` and others) and names that would
   pass for Pomi or Useroutr are reserved (`parseHandle` in `packages/shared`). A handle cannot be
   changed in phase 1, so links already shared keep working.
-- **A payout address** is connected or pasted. Before it is saved, the backend checks:
-  - the account exists, since a new Stellar account needs at least 1 XLM
-  - it trusts the asset the receiver wants (USDC needs a trustline)
-  - it is not an exchange address that requires a memo (SEP-29), because Useroutr pays without a
-    memo
+- **A payout address** is connected or pasted. The address's checksum is checked first, which
+  catches typos (`parseStellarAccount` in `packages/shared`). Then the backend reads the account
+  from Horizon:
+  - before it is saved: the account exists, since a new Stellar account needs at least 1 XLM,
+    and it is not an exchange address that requires a memo (SEP-29), because Useroutr pays
+    without a memo
+  - when a request is created: all of that again, and that the account trusts the request's
+    asset (USDC needs a trustline), since a receiver may ask for several assets
 
-  Each failure says what to do in the receiver's wallet. Useroutr refuses a missing account or
+  A request pays the address it was created with, even if the receiver changes address later:
+  what the payer was shown is where the money goes. Each failure says what to do in the
+  receiver's wallet. Useroutr refuses a missing account or
   trustline itself (`INVALID_DESTINATION`), but only when an intent is created, which is when a
   payer opens the link; checking at save spares the receiver a broken request. Useroutr does
   not refuse an address that requires a memo, so that check is the app's, and it is not
@@ -197,9 +205,10 @@ transaction.
 |---|---|---|
 | `users` | id, email, handle, display_name | email unique; handle unique, and its format checked |
 | `payout_addresses` | user_id, address, active, verified_at | one active address per user; the address is a Stellar account (`G…`) |
-| `requests` | id, user_id, kind (`single` / `reusable`), amount_kind (`fixed` / `open`), amount, minimum_amount, asset_id, note, listed, pay_box, status (`open` / `paid` / `closed`), ends_at | a fixed request has an amount and no minimum, an open one has no amount; amounts are positive; a single-use request is fixed; the pay box is reusable and one per user; a note is at most 280 characters |
-| `request_intents` | request_id, funding_intent_id, funding_token, visit_id, amount, exclusive, state (`open` / `closed`) | `funding_intent_id` unique; one per request and visit; one open intent per single-use request (`exclusive`), by a partial unique index |
-| `request_payments` | request_id, funding_intent_id, amount, asset_id, credited_at | `funding_intent_id` unique, so one credit counts once |
+| `requests` | id, user_id, payout_address_id, kind (`single` / `reusable`), amount_kind (`fixed` / `open`), amount, minimum_amount, asset_id, note, listed, pay_box, status (`open` / `paid` / `closed`), ends_at | a fixed request has an amount and no minimum, an open one has no amount; amounts are positive; a single-use request is fixed; the pay box is reusable and one per user; a note is at most 280 characters |
+| `request_intents` | request_id, funding_intent_id, funding_token, visit_id, amount, exclusive, state (`open` / `closed`), expires_at | `funding_intent_id` unique; one per request and visit; an exclusive intent has no visit and any other has one; one open intent per single-use request (`exclusive`), by a partial unique index |
+| `request_payments` | request_id, funding_intent_id, amount, asset_id, payment_transaction_hash, settlement_transaction_hash, credited_at | `funding_intent_id` unique, so one credit counts once |
+| `outbox_emails` | kind, request_payment_id, attempts, claimed_until, sent_at | one email of each kind per payment |
 | `refunds` | refund_id, funding_intent_id, status, destination_required_at | `refund_id` unique |
 | `webhook_events` | event_id, type, received_at, processed_at | `event_id` unique |
 | `sign_in_codes` | email, code_hash, attempts, expires_at, consumed_at | email lowercase; the code is stored as an HMAC keyed by the server's secret |
@@ -223,11 +232,12 @@ shape `{ "error": { "code", "message" } }`, and its message can be shown to the 
 | `POST /me/handle` | receiver | Claim a handle, once |
 | `GET/PUT /me/payout-address` | receiver | Read or set the payout address, with the checks in section 6 |
 | `GET/PUT /me/pay-box` | receiver | Read or set the pay box: asset, fixed amount or the payer's choice, minimum |
-| `POST /requests`, `GET /requests`, `PATCH /requests/:id`, `POST /requests/:id/close` | receiver | Manage requests, including listing or unlisting them |
+| `POST /requests`, `GET /requests`, `POST /requests/:id/close` | receiver | Create, list and close requests. `PATCH /requests/:id`, to list or unlist one, comes with handle pages. |
 | `GET /profiles/:handle` | anyone | A handle page: name, verification mark, pay box and listed requests |
-| `GET /r/:id` | anyone | The public view of a request |
+| `GET /r/:id` | anyone | The public view of a request, for the mobile app (phase 2). The web pay page renders it on the server. |
 | `POST /r/:id/checkout` | anyone | Reuses or creates the funding intent; returns its funding token for the checkout. For an open amount, the body carries the payer's amount. |
 | `POST /webhooks/useroutr` | Useroutr | Signed events |
+| `GET /jobs/send-emails` | the scheduler, with `CRON_SECRET` | Sends emails whose first send failed |
 | `POST /devices` | receiver | Register a push token |
 
 ## 9. Security and abuse
@@ -302,10 +312,10 @@ not enough. Phase 1 starts with the smaller slice in section 12.2.
 | Backend | The Next.js server, in phase 1: route handlers for the app's API and the webhook, over a `src/server` layer of services and repositories | One deployment for the first milestone, and the way `apps/demo` already verifies webhooks. The mobile app calls the same routes with a bearer token. It moves to a service of its own when push and background work outgrow it. |
 | Database | PostgreSQL with Prisma | The constraints in section 7 need a real database. The same tools as Useroutr. |
 | Useroutr | `@useroutr/sdk` on the server; `@useroutr/checkout-react` and `@useroutr/checkout-wallets` on the pay page | Public packages only |
-| Stellar reads | `@stellar/stellar-sdk` | The payout address checks in section 6: account, trustline, `config.memo_required` |
+| Stellar reads | Horizon's REST API, over `fetch` | The payout address checks in section 6: account, trustlines, `config.memo_required`. A plain read needs no SDK. |
 | Wallet signing | `@creit.tech/stellar-wallets-kit`, already under `@useroutr/checkout-wallets` | SEP-53 address verification (section 6) |
 | Email | Resend, on the app's own domain | Sign-in codes and paid notices. Useroutr uses it already. |
-| Notifications | An outbox table written in the same transaction as the webhook's change, sent after it, and retried by a scheduled job | A failed email or push never fails or repeats the webhook |
+| Notifications | An outbox table written in the same transaction as the webhook's change, sent right after the response, and retried by a scheduled job (`GET /api/jobs/send-emails`, every few minutes; Vercel's Hobby plan runs crons only daily) | A failed email or push never fails or repeats the webhook. Each send carries the outbox row's id as Resend's idempotency key, so a retry cannot email twice. |
 | Mobile (shell now, features in phase 2) | Expo SDK 58, with Expo Router, `expo-notifications`, `expo-camera`, `expo-secure-store`, `expo-web-browser`, and EAS Build and Submit | Push, QR scanning, a secure session, and the in-app browser for the pay page |
 | Hosting | Vercel for the web app, Neon for Postgres | Separate from Useroutr's own infrastructure, as any integrator's would be. Vercel's Hobby plan is for non-commercial use, so production goes on a paid plan. |
 

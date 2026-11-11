@@ -95,7 +95,8 @@ model PayoutAddress {
   verifiedAt DateTime? @map("verified_at")
   createdAt  DateTime  @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
+  requests Request[]
 
   @@index([userId])
   @@map("payout_addresses")
@@ -107,28 +108,32 @@ model PayoutAddress {
 // requests_pay_box_is_reusable, requests_note_length.
 // requests_one_pay_box_per_user: a partial unique index on user_id.
 model Request {
-  id            String        @id
-  userId        String        @map("user_id")
-  kind          RequestKind
-  amountKind    AmountKind    @map("amount_kind")
+  id              String        @id
+  userId          String        @map("user_id")
+  kind            RequestKind
+  amountKind      AmountKind    @map("amount_kind")
   // Stellar amounts: up to 12 whole digits and 7 decimal places.
-  amount        Decimal?      @db.Decimal(19, 7)
-  minimumAmount Decimal?      @map("minimum_amount") @db.Decimal(19, 7)
+  amount          Decimal?      @db.Decimal(19, 7)
+  minimumAmount   Decimal?      @map("minimum_amount") @db.Decimal(19, 7)
   // A Useroutr asset id, such as asset_usdc_stellar.
-  assetId       String        @map("asset_id")
-  note          String?
+  assetId         String        @map("asset_id")
+  // The address the request pays, fixed when it is created: what a payer
+  // was shown is where the money goes, even if the receiver changes address.
+  payoutAddressId String        @map("payout_address_id")
+  note            String?
   // Shown on the receiver's handle page.
-  listed        Boolean       @default(false)
+  listed          Boolean       @default(false)
   // The handle page's own pay box.
-  payBox        Boolean       @default(false) @map("pay_box")
-  status        RequestStatus @default(OPEN)
-  endsAt        DateTime?     @map("ends_at")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  closedAt      DateTime?     @map("closed_at")
+  payBox          Boolean       @default(false) @map("pay_box")
+  status          RequestStatus @default(OPEN)
+  endsAt          DateTime?     @map("ends_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  closedAt        DateTime?     @map("closed_at")
 
-  user     User             @relation(fields: [userId], references: [id])
-  intents  RequestIntent[]
-  payments RequestPayment[]
+  user          User             @relation(fields: [userId], references: [id])
+  payoutAddress PayoutAddress    @relation(fields: [payoutAddressId], references: [id])
+  intents       RequestIntent[]
+  payments      RequestPayment[]
 
   @@index([userId, status])
   @@map("requests")
@@ -136,18 +141,24 @@ model Request {
 
 // request_intents_one_open_exclusive: a partial unique index on request_id,
 //   for exclusive intents in the OPEN state.
+// request_intents_visit_matches_kind: an exclusive intent has no visit; any
+//   other has one.
 // request_intents_amount_positive.
 model RequestIntent {
   id              String      @id
   requestId       String      @map("request_id")
   fundingIntentId String      @unique @map("funding_intent_id")
   fundingToken    String      @map("funding_token")
-  visitId         String      @map("visit_id")
+  // The visit a per-visitor intent belongs to. A single-use request's
+  // intent is shared by every visitor, so it has none.
+  visitId         String?     @map("visit_id")
   // What the intent asks for; for an open amount, what the payer chose.
   amount          Decimal     @db.Decimal(19, 7)
   // Set for a single-use request's intent, which every visitor shares.
   exclusive       Boolean
   state           IntentState @default(OPEN)
+  // When Useroutr stops taking payment for the intent.
+  expiresAt       DateTime    @map("expires_at")
   createdAt       DateTime    @default(now()) @map("created_at")
   closedAt        DateTime?   @map("closed_at")
 
@@ -159,19 +170,47 @@ model RequestIntent {
 
 // request_payments_amount_positive.
 model RequestPayment {
-  id              String   @id
-  requestId       String   @map("request_id")
+  id                        String   @id
+  requestId                 String   @map("request_id")
   // One credited funding intent counts as one payment, however often its
   // webhook arrives.
-  fundingIntentId String   @unique @map("funding_intent_id")
-  amount          Decimal  @db.Decimal(19, 7)
-  assetId         String   @map("asset_id")
-  creditedAt      DateTime @map("credited_at")
+  fundingIntentId           String   @unique @map("funding_intent_id")
+  amount                    Decimal  @db.Decimal(19, 7)
+  assetId                   String   @map("asset_id")
+  // The payer's transaction, and the one that paid the receiver.
+  paymentTransactionHash    String?  @map("payment_transaction_hash")
+  settlementTransactionHash String?  @map("settlement_transaction_hash")
+  creditedAt                DateTime @map("credited_at")
 
-  request Request @relation(fields: [requestId], references: [id])
+  request Request       @relation(fields: [requestId], references: [id])
+  emails  OutboxEmail[]
 
   @@index([requestId])
   @@map("request_payments")
+}
+
+enum EmailKind {
+  PAYMENT_RECEIVED
+}
+
+// Written in the same transaction as the change it reports, and sent after
+// the commit, so a failed send never fails or repeats that change. One email
+// of each kind per payment, however often the webhook arrives.
+// outbox_emails_unsent: a partial index for the sender's query.
+model OutboxEmail {
+  id               String    @id
+  kind             EmailKind
+  requestPaymentId String    @map("request_payment_id")
+  attempts         Int       @default(0)
+  // A sender holds the email until then, so two senders never both send it.
+  claimedUntil     DateTime? @map("claimed_until")
+  sentAt           DateTime? @map("sent_at")
+  createdAt        DateTime  @map("created_at")
+
+  requestPayment RequestPayment @relation(fields: [requestPaymentId], references: [id])
+
+  @@unique([kind, requestPaymentId])
+  @@map("outbox_emails")
 }
 
 model Refund {
