@@ -51,7 +51,7 @@ export function ProfileForm({
     <div className="stack">
       {pageUrl === null ? (
         <form className="form" onSubmit={(event) => void claimHandle(event)}>
-          <label htmlFor="handle">Your page</label>
+          <label htmlFor="handle">Handle</label>
           <div className="row">
             <span className="muted">{appUrl.replace(/^https?:\/\//, "")}/</span>
             <input
