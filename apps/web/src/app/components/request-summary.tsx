@@ -22,7 +22,7 @@ export function RequestSummary({ request }: { request: PayerRequest }) {
         {request.payoutAddressVerified
           ? ", a verified address"
           : ", an address the receiver pasted"}
-        {request.kind === "REUSABLE" && ". This link can be paid more than once"}
+        {request.kind === "REUSABLE" && ". This link can be paid more than once"}.
       </p>
     </section>
   );
