@@ -97,9 +97,9 @@ export default function RequestScreen() {
           fontWeight: "600",
         }}
       >
-        {STATUS_LABELS[request.status]}
-        {request.kind === "REUSABLE" &&
-          `, paid ${String(paidCount)} ${paidCount === 1 ? "time" : "times"}`}
+        {request.kind === "REUSABLE"
+          ? reusableStatus(request.status, paidCount)
+          : STATUS_LABELS[request.status]}
       </Text>
 
       {request.status === "OPEN" && (
@@ -156,4 +156,13 @@ export default function RequestScreen() {
       />
     </ScrollView>
   );
+}
+
+// A reusable request is never "paid" as a whole: it stays open until closed.
+function reusableStatus(status: ReceiverRequest["status"], paidCount: number): string {
+  const payments =
+    paidCount === 0
+      ? "not paid yet"
+      : `paid ${String(paidCount)} ${paidCount === 1 ? "time" : "times"}`;
+  return `${status === "CLOSED" ? "Closed" : "Open"}, ${payments}`;
 }

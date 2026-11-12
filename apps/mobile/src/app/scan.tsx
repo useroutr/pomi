@@ -3,7 +3,7 @@ import { type BarcodeScanningResult, CameraView, useCameraPermissions } from "ex
 import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Linking, StyleSheet, View } from "react-native";
 import { Body, Button, ErrorText, styles } from "@/components/ui";
 import { APP_URL } from "@/lib/config";
 
@@ -44,10 +44,16 @@ export default function ScanScreen() {
     return <View style={styles.screen} />;
   }
   if (!permission.granted) {
+    // Once the camera is refused, the system will not ask again: only the
+    // Settings app can turn it back on.
     return (
       <View style={styles.screen}>
         <Body>Pomi needs the camera to scan a QR code.</Body>
-        <Button title="Allow the camera" onPress={() => void requestPermission()} />
+        {permission.canAskAgain ? (
+          <Button title="Allow the camera" onPress={() => void requestPermission()} />
+        ) : (
+          <Button title="Open Settings" onPress={() => void Linking.openSettings()} />
+        )}
       </View>
     );
   }

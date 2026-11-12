@@ -52,6 +52,7 @@ export default function SignInScreen() {
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
+              autoCorrect={false}
               autoComplete="email"
               keyboardType="email-address"
               textContentType="emailAddress"

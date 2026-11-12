@@ -108,7 +108,10 @@ export default function RequestsScreen() {
                 </Text>
                 <Text
                   style={{
-                    color: item.status === "PAID" ? colors.success : colors.muted,
+                    color:
+                      item.status === "PAID" || item.payments.length > 0
+                        ? colors.success
+                        : colors.muted,
                     fontWeight: "600",
                   }}
                 >
