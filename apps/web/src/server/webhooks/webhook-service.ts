@@ -10,9 +10,11 @@ import {
   insertPayment,
   insertProcessedEvent,
   intentForFundingIntent,
-  markRequestPaid,
+  markSingleRequestPaid,
   paymentExists,
-  queuePaymentEmail,
+  queuePaymentNotices,
+  queueRefundAlert,
+  upsertRefund,
 } from "./webhook-repository";
 
 export type DeliveryOutcome = "processed" | "duplicate";
@@ -34,9 +36,17 @@ const creditedIntentSchema = z.object({
     .nullable(),
 });
 
+const refundSchema = z.object({
+  id: z.string().min(1),
+  funding_intent_id: z.string().min(1),
+  status: z.string().min(1),
+});
+
 export interface WebhookServiceDependencies {
   database: Database;
   useroutr: Pick<UseroutrGateway, "constructWebhookEvent">;
+  // Whether anyone is set to be told about refunds that need a destination.
+  alertsOperator: boolean;
   now?: () => Date;
 }
 
@@ -45,6 +55,7 @@ export type WebhookService = ReturnType<typeof createWebhookService>;
 export function createWebhookService({
   database,
   useroutr,
+  alertsOperator,
   now = () => new Date(),
 }: WebhookServiceDependencies) {
   // Throws WebhookSignatureError for a delivery that is not Useroutr's.
@@ -77,6 +88,14 @@ export function createWebhookService({
       case "funding.failed":
         // The next visitor then starts a new intent without asking Useroutr.
         await closeIntent(transaction, event.data.object.id, now());
+        return;
+      case "refund.created":
+      case "refund.completed":
+      case "refund.failed":
+        await upsertRefund(transaction, refundRecord(event.data.object));
+        return;
+      case "refund.destination_required":
+        await recordRefundNeedingDestination(transaction, event.data.object, event.created_at);
         return;
       default:
         // Acknowledged and recorded, so Useroutr stops sending it.
@@ -112,13 +131,37 @@ export function createWebhookService({
       creditedAt,
     });
     await closeIntent(transaction, credited.id, now());
-    await markRequestPaid(transaction, intent.requestId);
-    await queuePaymentEmail(transaction, {
-      id: newId("email"),
+    await markSingleRequestPaid(transaction, intent.requestId);
+    await queuePaymentNotices(transaction, {
       requestPaymentId: paymentId,
+      emailId: newId("email"),
+      pushId: newId("push"),
       createdAt: now(),
     });
   }
 
+  // Useroutr cannot tell where this refund should go; in phase 1 only the
+  // operator can find the payer and name it (docs/spec.md, section 9).
+  async function recordRefundNeedingDestination(
+    transaction: Prisma.TransactionClient,
+    object: unknown,
+    eventCreatedAt: string,
+  ) {
+    const refund = refundRecord(object);
+    await upsertRefund(transaction, { ...refund, destinationRequiredAt: new Date(eventCreatedAt) });
+    if (alertsOperator) {
+      await queueRefundAlert(transaction, {
+        id: newId("email"),
+        refundId: refund.id,
+        createdAt: now(),
+      });
+    }
+  }
+
   return { handleDelivery };
+}
+
+function refundRecord(object: unknown) {
+  const refund = refundSchema.parse(object);
+  return { id: refund.id, fundingIntentId: refund.funding_intent_id, status: refund.status };
 }

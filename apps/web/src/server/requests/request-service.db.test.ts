@@ -8,7 +8,10 @@ import {
   PayoutAssetNotTrustedError,
 } from "../payout-addresses/payout-address-errors";
 import { createPayoutAddressService } from "../payout-addresses/payout-address-service";
+import { ProfileNotFoundError } from "../profiles/profile-errors";
 import {
+  InvalidEndDateError,
+  InvalidMinimumError,
   InvalidNoteError,
   RequestAlreadyPaidError,
   RequestNotFoundError,
@@ -149,11 +152,15 @@ describe("listing and showing requests", () => {
 
     expect(shown).toEqual({
       id: created.id,
+      kind: "SINGLE",
       amount: "25",
+      minimumAmount: null,
       assetSymbol: "USDC",
       note: "Logo design",
       status: "OPEN",
+      ended: false,
       receiverName: null,
+      receiverHandle: null,
       payoutAddress: RECEIVER_ACCOUNT,
       payoutAddressVerified: false,
     });
@@ -201,5 +208,174 @@ describe("closing a request", () => {
     await expect(requests.closeRequest("usr_1", created.id)).rejects.toThrow(
       RequestAlreadyPaidError,
     );
+  });
+});
+
+describe("reusable and listed requests", () => {
+  it("creates a reusable request, listed on the receiver's page, with an end date", async () => {
+    const { requests } = services();
+
+    const created = await requests.createRequest("usr_1", {
+      amount: "10",
+      assetId: "asset_xlm_stellar",
+      reusable: true,
+      listed: true,
+      endsAt: "2099-01-01T00:00:00Z",
+    });
+
+    await expect(
+      database.request.findUniqueOrThrow({ where: { id: created.id } }),
+    ).resolves.toMatchObject({
+      kind: "REUSABLE",
+      amountKind: "FIXED",
+      listed: true,
+      endsAt: new Date("2099-01-01T00:00:00Z"),
+    });
+  });
+
+  it.each(["2020-01-01", "not a date"])("refuses the end date %j", async (endsAt) => {
+    await expect(
+      services().requests.createRequest("usr_1", {
+        amount: "10",
+        assetId: "asset_xlm_stellar",
+        endsAt,
+      }),
+    ).rejects.toThrow(InvalidEndDateError);
+  });
+
+  it("lists and unlists the receiver's own request only", async () => {
+    const { requests } = services();
+    const created = await requests.createRequest("usr_1", {
+      amount: "5",
+      assetId: "asset_xlm_stellar",
+    });
+
+    await requests.updateRequest("usr_1", created.id, { listed: true });
+
+    await expect(
+      database.request.findUniqueOrThrow({ where: { id: created.id } }),
+    ).resolves.toMatchObject({ listed: true });
+    await expect(requests.updateRequest("usr_2", created.id, { listed: false })).rejects.toThrow(
+      RequestNotFoundError,
+    );
+  });
+});
+
+describe("the pay box", () => {
+  it("lets the payer choose the amount, above an optional minimum", async () => {
+    const { requests } = services();
+
+    const saved = await requests.setPayBox("usr_1", {
+      assetId: "asset_usdc_stellar",
+      minimumAmount: "5",
+    });
+
+    expect(saved).toEqual({
+      open: true,
+      assetId: "asset_usdc_stellar",
+      assetSymbol: "USDC",
+      amount: null,
+      minimumAmount: "5",
+      payoutAddress: RECEIVER_ACCOUNT,
+    });
+    await expect(
+      database.request.findFirstOrThrow({ where: { payBox: true } }),
+    ).resolves.toMatchObject({
+      kind: "REUSABLE",
+      amountKind: "OPEN",
+    });
+  });
+
+  it("changes the one pay box in place, and can close and reopen it", async () => {
+    const { requests } = services();
+    await requests.setPayBox("usr_1", { assetId: "asset_usdc_stellar" });
+
+    await requests.setPayBox("usr_1", { assetId: "asset_xlm_stellar", amount: "3" });
+    await requests.closePayBox("usr_1");
+
+    await expect(requests.payBox("usr_1")).resolves.toMatchObject({
+      open: false,
+      assetSymbol: "XLM",
+      amount: "3",
+    });
+    await requests.setPayBox("usr_1", { assetId: "asset_xlm_stellar", amount: "4" });
+    await expect(requests.payBox("usr_1")).resolves.toMatchObject({ open: true, amount: "4" });
+    expect(await database.request.count({ where: { payBox: true } })).toBe(1);
+  });
+
+  it("keeps one pay box when two saves arrive together", async () => {
+    const { requests } = services();
+
+    await Promise.all([
+      requests.setPayBox("usr_1", { assetId: "asset_usdc_stellar" }),
+      requests.setPayBox("usr_1", { assetId: "asset_xlm_stellar", amount: "1" }),
+    ]);
+
+    expect(await database.request.count({ where: { payBox: true } })).toBe(1);
+  });
+
+  it("refuses a minimum beside a fixed amount", async () => {
+    await expect(
+      services().requests.setPayBox("usr_1", {
+        assetId: "asset_usdc_stellar",
+        amount: "10",
+        minimumAmount: "5",
+      }),
+    ).rejects.toThrow(InvalidMinimumError);
+  });
+
+  it("is not one of the receiver's listed requests", async () => {
+    const { requests } = services();
+    await requests.setPayBox("usr_1", { assetId: "asset_usdc_stellar" });
+
+    await expect(requests.listRequests("usr_1")).resolves.toEqual([]);
+  });
+});
+
+describe("handle pages", () => {
+  async function withHandle(handle: string) {
+    await database.user.update({
+      where: { id: "usr_1" },
+      data: { handle, displayName: "Ada Lovelace" },
+    });
+  }
+
+  it("shows the receiver's name, open pay box and listed open requests only", async () => {
+    await withHandle("ada");
+    const { requests } = services();
+    await requests.setPayBox("usr_1", { assetId: "asset_usdc_stellar", minimumAmount: "1" });
+    const listed = await requests.createRequest("usr_1", {
+      amount: "5",
+      assetId: "asset_xlm_stellar",
+      listed: true,
+    });
+    await requests.createRequest("usr_1", { amount: "6", assetId: "asset_xlm_stellar" });
+    const closed = await requests.createRequest("usr_1", {
+      amount: "7",
+      assetId: "asset_xlm_stellar",
+      listed: true,
+    });
+    await requests.closeRequest("usr_1", closed.id);
+
+    const page = await requests.handlePage("Ada");
+
+    expect(page.handle).toBe("ada");
+    expect(page.displayName).toBe("Ada Lovelace");
+    expect(page.payBox).toMatchObject({ kind: "REUSABLE", amount: null, minimumAmount: "1" });
+    expect(page.listedRequests.map((request) => request.id)).toEqual([listed.id]);
+    expect(JSON.stringify(page)).not.toContain("receiver@example.com");
+  });
+
+  it("shows no pay box once it is closed", async () => {
+    await withHandle("ada");
+    const { requests } = services();
+    await requests.setPayBox("usr_1", { assetId: "asset_usdc_stellar" });
+    await requests.closePayBox("usr_1");
+
+    await expect(requests.handlePage("ada")).resolves.toMatchObject({ payBox: null });
+  });
+
+  it("has no page for a handle nobody holds", async () => {
+    await expect(services().requests.handlePage("nobody")).rejects.toThrow(ProfileNotFoundError);
   });
 });

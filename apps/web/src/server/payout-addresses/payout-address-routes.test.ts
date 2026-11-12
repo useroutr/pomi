@@ -1,4 +1,5 @@
 import { InvalidStellarAccountError } from "@pomi/shared";
+import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 import { apiRequest, errorCode, fakeAuth } from "@/test/route-requests";
 import { StellarNetworkUnavailableError } from "../stellar/horizon-account-reader";
@@ -31,6 +32,26 @@ describe("payout address routes", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ payoutAddress: saved });
+  });
+
+  it("accepts the mobile app's bearer token in place of the cookie", async () => {
+    const request = new NextRequest("http://localhost:3000/api/me/payout-address", {
+      headers: { authorization: "Bearer valid" },
+    });
+
+    const response = await handleGetPayoutAddress(request, services);
+
+    expect(response.status).toBe(200);
+  });
+
+  it("refuses a bearer token it does not know", async () => {
+    const request = new NextRequest("http://localhost:3000/api/me/payout-address", {
+      headers: { authorization: "Bearer stolen" },
+    });
+
+    const response = await handleGetPayoutAddress(request, services);
+
+    expect(response.status).toBe(401);
   });
 
   it("refuses anyone not signed in", async () => {

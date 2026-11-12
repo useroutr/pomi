@@ -11,9 +11,15 @@ import {
 } from "./auth-errors";
 import { type AuthService } from "./auth-service";
 import { SESSION_COOKIE, sessionCookieOptions } from "./session-cookie";
+import { sessionToken } from "./signed-in-user";
 
 const requestCodeBodySchema = z.object({ email: z.string().max(320) });
-const verifyCodeBodySchema = z.object({ email: z.string().max(320), code: z.string().max(32) });
+const verifyCodeBodySchema = z.object({
+  email: z.string().max(320),
+  code: z.string().max(32),
+  // The mobile app keeps the token in its secure store; the web never sees it.
+  client: z.enum(["web", "mobile"]).default("web"),
+});
 
 export async function handleRequestSignInCode(
   request: NextRequest,
@@ -50,8 +56,14 @@ export async function handleVerifySignInCode(
   try {
     const body = await readJsonBody(request, verifyCodeBodySchema);
     const grant = await authService.verifySignInCode(body.email, body.code);
-    // The token goes only into the cookie, never the body, so page scripts
-    // never see it.
+    if (body.client === "mobile") {
+      return NextResponse.json({
+        user: { handle: grant.user.handle },
+        session: { token: grant.token, expiresAt: grant.expiresAt.toISOString() },
+      });
+    }
+    // On the web the token goes only into the cookie, never the body, so
+    // page scripts never see it.
     const response = NextResponse.json({ user: { handle: grant.user.handle } });
     response.cookies.set(SESSION_COOKIE, grant.token, sessionCookieOptions(grant.expiresAt));
     return response;
@@ -70,7 +82,7 @@ export async function handleSignOut(
   request: NextRequest,
   authService: Pick<AuthService, "signOut">,
 ): Promise<NextResponse> {
-  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  const token = sessionToken(request);
   if (token !== undefined) {
     await authService.signOut(token);
   }

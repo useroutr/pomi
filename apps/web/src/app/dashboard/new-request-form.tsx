@@ -18,6 +18,9 @@ export function NewRequestForm({ assets }: { assets: RequestableAsset[] }) {
   const [amount, setAmount] = useState("");
   const [assetId, setAssetId] = useState(assets[0]?.id ?? "");
   const [note, setNote] = useState("");
+  const [reusable, setReusable] = useState(false);
+  const [listed, setListed] = useState(false);
+  const [endsAt, setEndsAt] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
@@ -28,7 +31,15 @@ export function NewRequestForm({ assets }: { assets: RequestableAsset[] }) {
     setError(null);
     const result = await callApi("/api/requests", {
       method: "POST",
-      body: { amount, assetId, note },
+      body: {
+        amount,
+        assetId,
+        note,
+        reusable,
+        listed,
+        // datetime-local has no zone: it is the receiver's local time.
+        ...(endsAt === "" ? {} : { endsAt: new Date(endsAt).toISOString() }),
+      },
     });
     setPending(false);
     if (!result.ok) {
@@ -39,6 +50,7 @@ export function NewRequestForm({ assets }: { assets: RequestableAsset[] }) {
     setCreatedUrl(created.success ? created.data.request.url : null);
     setAmount("");
     setNote("");
+    setEndsAt("");
     router.refresh();
   }
 
@@ -87,6 +99,35 @@ export function NewRequestForm({ assets }: { assets: RequestableAsset[] }) {
         value={note}
         onChange={(event) => {
           setNote(event.target.value);
+        }}
+      />
+      <label className="choice">
+        <input
+          type="checkbox"
+          checked={reusable}
+          onChange={(event) => {
+            setReusable(event.target.checked);
+          }}
+        />
+        Reusable: anyone can pay it, any number of times
+      </label>
+      <label className="choice">
+        <input
+          type="checkbox"
+          checked={listed}
+          onChange={(event) => {
+            setListed(event.target.checked);
+          }}
+        />
+        Show it on my page
+      </label>
+      <label htmlFor="ends-at">Ends (optional)</label>
+      <input
+        id="ends-at"
+        type="datetime-local"
+        value={endsAt}
+        onChange={(event) => {
+          setEndsAt(event.target.value);
         }}
       />
       {error !== null && <p className="error">{error}</p>}
