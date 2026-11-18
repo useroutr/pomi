@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "buildCommand": "cd ../.. && pnpm turbo run build --filter=@pomi/web && if [ \"$VERCEL_ENV\" = production ]; then pnpm --filter @pomi/web prisma:migrate:deploy; fi",
+  "crons": [{ "path": "/api/jobs/send-emails", "schedule": "0 6 * * *" }]
+}

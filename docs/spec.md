@@ -389,7 +389,11 @@ The app has two environments, each tied to one Useroutr environment. They share 
 | Useroutr key | `ur_test_`; the SDK picks `api.sandbox.useroutr.com` from it | `ur_live_`; the SDK picks `api.useroutr.com` |
 | Checkout `baseUrl` | `https://api.sandbox.useroutr.com/v1/public` | `https://api.useroutr.com/v1/public` |
 | Database, webhook secret, WalletConnect project, email sender | its own | its own |
-| Host | a testnet subdomain, with a banner saying it is testnet | the app's domain |
+| Host | a testnet subdomain, with a banner saying it is testnet | the app's domain; `pomi.useroutr.com` until one is bought |
+
+Production runs on Vercel from `main`, with Neon's Postgres. `apps/web/vercel.json` holds the
+build (Turborepo, so the Prisma client is generated first), applies migrations on production
+builds only, and runs the email job daily as a backstop to the send that follows each webhook.
 
 Things to know about testnet:
 - **MetaMask's Stellar account does not work on testnet.** Use Freighter or xBull there.
