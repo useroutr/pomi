@@ -1,4 +1,5 @@
 import "server-only";
+import { type ActivityService, createActivityService } from "./activity/activity-service";
 import { createAuthService, type AuthService } from "./auth/auth-service";
 import { createCheckoutService, type CheckoutService } from "./checkout/checkout-service";
 import { serverConfig } from "./config";
@@ -18,6 +19,7 @@ import { createUseroutrGateway } from "./useroutr/useroutr-gateway";
 import { createWebhookService, type WebhookService } from "./webhooks/webhook-service";
 
 interface AppServices {
+  activity: ActivityService;
   auth: AuthService;
   profiles: ProfileService;
   devices: DeviceService;
@@ -54,6 +56,7 @@ function appServices(): AppServices {
       network: config.stellar.network,
     });
     services = {
+      activity: createActivityService({ database, useroutr }),
       auth: createAuthService({ database, emailDelivery, authSecret: config.authSecret }),
       profiles: createProfileService({ database }),
       devices: createDeviceService({ database }),
@@ -79,6 +82,7 @@ function appServices(): AppServices {
   return services;
 }
 
+export const activityService = () => appServices().activity;
 export const authService = () => appServices().auth;
 export const profileService = () => appServices().profiles;
 export const deviceService = () => appServices().devices;
