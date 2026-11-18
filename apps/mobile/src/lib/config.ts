@@ -17,3 +17,17 @@ export function requestLink(requestId: string): string {
 export function pageLink(handle: string): string {
   return `${APP_URL}/${handle}`;
 }
+
+// The link as people read it: "pomi.app/ada", without the scheme.
+export function pageHost(): string {
+  return APP_URL.replace(/^https?:\/\//, "");
+}
+
+export function displayLink(url: string): string {
+  return url.replace(/^https?:\/\//, "");
+}
+
+export function transactionUrl(network: "testnet" | "mainnet", hash: string): string {
+  const explorerNetwork = network === "mainnet" ? "public" : "testnet";
+  return `https://stellar.expert/explorer/${explorerNetwork}/tx/${encodeURIComponent(hash)}`;
+}

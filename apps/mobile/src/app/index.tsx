@@ -1,130 +1,48 @@
-import { Redirect, router, Stack, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from "react-native";
-import { Body, Button, Card, ErrorText, styles, useColors } from "@/components/ui";
-import { type ReceiverRequest, requestsSchema } from "@/lib/api";
+import { type Href, Redirect } from "expo-router";
+import { useEffect, useState } from "react";
+import { StyleSheet, View } from "react-native";
+import { PomiTile } from "@/components/logo";
+import { meSchema } from "@/lib/api";
 import { useSession } from "@/lib/session";
+import { usePalette } from "@/theme/theme";
 
-const STATUS_LABELS = { OPEN: "Waiting", PAID: "Paid", CLOSED: "Closed" } as const;
+// Where a launch lands: the welcome for someone signed out, the link step
+// for someone who signed in but never claimed a handle, and home otherwise.
+export default function LaunchGate() {
+  const { state, api, signOut } = useSession();
+  const palette = usePalette();
+  const [destination, setDestination] = useState<Href | null>(null);
 
-export default function RequestsScreen() {
-  const { state, api } = useSession();
-  const colors = useColors();
-  const [requests, setRequests] = useState<ReceiverRequest[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    const result = await api.get("/api/requests", requestsSchema);
-    if (result.ok) {
-      setRequests(result.value.requests);
-      setError(null);
-    } else {
-      setError(result.message);
+  useEffect(() => {
+    if (state.status !== "signed-in") {
+      return;
     }
-  }, [api]);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (state.status === "signed-in") {
-        void load();
+    void api.get("/api/me", meSchema).then(async (result) => {
+      if (result.ok) {
+        setDestination(result.value.user.handle === null ? "/link" : "/home");
+      } else if (result.status === 401) {
+        // The session ended on the server (signed out elsewhere, or expired).
+        await signOut();
+      } else {
+        setDestination("/home");
       }
-    }, [state.status, load]),
-  );
+    });
+  }, [state.status, api, signOut]);
 
-  if (state.status === "loading") {
-    return <ActivityIndicator style={{ flex: 1 }} />;
-  }
   if (state.status === "signed-out") {
-    return <Redirect href="/sign-in" />;
+    return <Redirect href="/welcome" />;
   }
-
+  if (destination !== null) {
+    return <Redirect href={destination} />;
+  }
+  // Looks like the splash it follows, so launch reads as one moment.
   return (
-    <>
-      <Stack.Screen
-        options={{
-          headerRight: () => (
-            <View style={styles.row}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  router.push({ pathname: "/scan", params: { for: "link" } });
-                }}
-              >
-                <Text style={{ color: colors.foreground, fontSize: 16 }}>Scan</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  router.push("/settings");
-                }}
-              >
-                <Text style={{ color: colors.foreground, fontSize: 16 }}>Settings</Text>
-              </Pressable>
-            </View>
-          ),
-        }}
-      />
-      <FlatList
-        contentContainerStyle={styles.screen}
-        data={requests ?? []}
-        keyExtractor={(request) => request.id}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              void load().finally(() => {
-                setRefreshing(false);
-              });
-            }}
-          />
-        }
-        ListHeaderComponent={
-          <View style={{ gap: 12 }}>
-            <Button
-              title="New request"
-              onPress={() => {
-                router.push("/requests/new");
-              }}
-            />
-            <ErrorText message={error} />
-          </View>
-        }
-        ListEmptyComponent={
-          requests === null ? <ActivityIndicator /> : <Body muted>No requests yet.</Body>
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              router.push({ pathname: "/requests/[id]", params: { id: item.id } });
-            }}
-          >
-            <Card>
-              <View style={[styles.row, { justifyContent: "space-between" }]}>
-                <Text style={{ color: colors.foreground, fontSize: 17, fontWeight: "600" }}>
-                  {item.amount ?? "Any amount of"} {item.assetSymbol}
-                </Text>
-                <Text
-                  style={{
-                    color:
-                      item.status === "PAID" || item.payments.length > 0
-                        ? colors.success
-                        : colors.muted,
-                    fontWeight: "600",
-                  }}
-                >
-                  {item.kind === "REUSABLE" && item.payments.length > 0
-                    ? `Paid ${String(item.payments.length)}x`
-                    : STATUS_LABELS[item.status]}
-                </Text>
-              </View>
-              {item.note !== null && <Body>{item.note}</Body>}
-            </Card>
-          </Pressable>
-        )}
-      />
-    </>
+    <View style={[styles.center, { backgroundColor: palette.background }]}>
+      <PomiTile size={112} />
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+});
