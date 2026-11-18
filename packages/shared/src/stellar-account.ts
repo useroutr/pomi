@@ -33,6 +33,33 @@ export function parseStellarAccount(input: string): string {
   return address;
 }
 
+const ACCOUNT_IN_TEXT = /(?:^|[^A-Z2-7])(G[A-Z2-7]{55})(?![A-Z2-7])/g;
+
+// Finds the one valid account address in whatever was copied or scanned: the
+// address alone, a sentence around it, or a wallet's payment link
+// (web+stellar:pay?destination=G...). Two different valid addresses are
+// ambiguous, so neither is taken.
+export function findStellarAccount(text: string): string | null {
+  const addresses = new Set<string>();
+  for (const match of text.toUpperCase().matchAll(ACCOUNT_IN_TEXT)) {
+    const candidate = match[1];
+    if (candidate !== undefined && isValidStellarAccount(candidate)) {
+      addresses.add(candidate);
+    }
+  }
+  const [address] = addresses;
+  return addresses.size === 1 && address !== undefined ? address : null;
+}
+
+function isValidStellarAccount(address: string): boolean {
+  try {
+    parseStellarAccount(address);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function shortenStellarAccount(address: string): string {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
