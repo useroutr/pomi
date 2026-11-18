@@ -8,7 +8,8 @@
     "scheme": "pomi",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/pomi.icon"
+      "icon": "./assets/pomi.icon",
+      "bundleIdentifier": "com.useroutr.pomi"
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +18,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.useroutr.pomi"
     },
     "plugins": [
       "expo-router",
