@@ -5,6 +5,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { type AuthService } from "../auth/auth-service";
 import { signedInUser } from "../auth/signed-in-user";
+import { type StellarNetwork } from "../config";
 import { errorResponse, requestErrorResponse, rethrow } from "../http/error-response";
 import { readJsonBody } from "../http/json-request";
 import {
@@ -31,6 +32,7 @@ interface Services {
     | "closeRequest"
     | "updateRequest"
     | "requestableAssets"
+    | "paymentNetworks"
     | "payBox"
     | "setPayBox"
     | "closePayBox"
@@ -101,12 +103,27 @@ export async function handleUpdateRequest(
   }
 }
 
-export async function handleListAssets(request: NextRequest, services: Services) {
+// The network comes along so the app can link a payment to its Stellar
+// transaction on the right explorer.
+export async function handleListAssets(
+  request: NextRequest,
+  services: Services & { network: StellarNetwork },
+) {
   try {
     await signedInUser(request, services.auth);
-    const assets = await services.requests.requestableAssets();
+    const [assets, payWith] = await Promise.all([
+      services.requests.requestableAssets(),
+      services.requests.paymentNetworks(),
+    ]);
     return NextResponse.json({
-      assets: assets.map((asset) => ({ id: asset.id, symbol: asset.symbol })),
+      assets: assets.map((asset) => ({
+        id: asset.id,
+        symbol: asset.symbol,
+        network: asset.network,
+        decimals: asset.decimals,
+      })),
+      network: services.network,
+      payWith,
     });
   } catch (error) {
     return useroutrErrorResponse(error) ?? requestErrorResponse(error) ?? rethrow(error);

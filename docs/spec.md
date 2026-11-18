@@ -39,12 +39,14 @@ people use it, and it shows the protocol working. This app plays the same part f
 **Receiver**
 1. Signs in with email and a one-time code. This works on every platform without a wallet.
 2. Picks a handle. `pomi.app/<handle>` is their page (section 6).
-3. Adds a payout address: connects a Stellar wallet, or pastes or scans an address. See section 6
-   for the checks.
+3. Adds a payout address on each network they want to be paid on: Stellar, or a network Useroutr
+   delivers to, such as Base. Connects a Stellar wallet, or pastes or scans an address. See
+   section 6 for the checks.
 4. Sets up the pay box on their page: an asset, and either a fixed amount or the payer's choice,
    with an optional minimum.
 5. Creates requests:
-   - a fixed amount and asset (XLM or USDC on Stellar)
+   - a fixed amount and asset: XLM or USDC on Stellar, or USDC on another network Useroutr
+     delivers it to. Payers still pay from any network.
    - a note
    - single-use (an invoice) or reusable (the same amount, paid any number of times)
    - listed on their page, or unlisted and reachable only by its link (the default for invoices)
@@ -128,7 +130,7 @@ visitor and IP address can open.
   - create requests and share them through the share sheet
   - show and scan QR codes
   - list requests and see their status
-  - push notifications
+  - push notifications, asked for after the receiver's first request rather than at sign-in
 
   The app reads `EXPO_PUBLIC_APP_URL` for the web app it talks to. Push needs an EAS project id
   (`eas init`) and a real device; without either, payments still arrive by email.
@@ -172,9 +174,23 @@ Paying by hand works everywhere, so any payer can always pay.
   the app's own routes use (`r`, `api`, `dashboard`, `settings` and others) and names that would
   pass for Pomi or Useroutr are reserved (`parseHandle` in `packages/shared`). A handle cannot be
   changed in phase 1, so links already shared keep working.
-- **A payout address** is connected or pasted. The address's checksum is checked first, which
-  catches typos (`parseStellarAccount` in `packages/shared`). Then the backend reads the account
-  from Horizon:
+- **Payout networks come from Useroutr.** `GET /v1/assets` marks each asset `destination: true`
+  when a funding intent can pay a receiver in it: every Stellar asset, and an asset on another
+  network when one of Useroutr's cross-chain rails delivers it there. Pomi offers USDC and XLM
+  wherever they are marked, so a network Useroutr starts paying out on needs no change in Pomi.
+  A request pays out in its asset on that asset's own network.
+- **One payout address per network.** A receiver has at most one active address on each
+  network, and saving a new one on Stellar leaves their Base address as it was. The database
+  enforces both, and that each address is written the way its network writes accounts.
+- **An EVM address** (Base, Arbitrum and the rest) is checked on the phone and again on the
+  server: `0x` and 40 hex digits, and when written in mixed case its EIP-55 checksum must match
+  (`parseEvmAddress` in `packages/shared`). It is stored checksummed. An address written in one
+  case carries no checksum, so the app says it cannot catch a typo in it and asks the receiver
+  to compare it with their wallet. Nothing is read from the network: an EVM address needs no
+  account to exist and no trustline.
+- **A Stellar payout address** is connected or pasted. The address's checksum is checked first,
+  which catches typos (`parseStellarAccount` in `packages/shared`). Then the backend reads the
+  account from Horizon:
   - before it is saved: the account exists, since a new Stellar account needs at least 1 XLM,
     and it is not an exchange address that requires a memo (SEP-29), because Useroutr pays
     without a memo
@@ -207,7 +223,7 @@ transaction.
 | Table | Key fields | Constraints |
 |---|---|---|
 | `users` | id, email, handle, display_name | email unique; handle unique, and its format checked |
-| `payout_addresses` | user_id, address, active, verified_at | one active address per user; the address is a Stellar account (`G…`) |
+| `payout_addresses` | user_id, network, address, active, verified_at | one active address per user and network; `network` is a lowercase Useroutr network id; a `stellar` address is a Stellar account (`G…`), any other network's is an EVM address (`0x` and 40 hex digits) |
 | `requests` | id, user_id, payout_address_id, kind (`single` / `reusable`), amount_kind (`fixed` / `open`), amount, minimum_amount, asset_id, note, listed, pay_box, status (`open` / `paid` / `closed`), ends_at | a fixed request has an amount and no minimum, an open one has no amount; amounts are positive; a single-use request is fixed; the pay box is reusable and one per user; a note is at most 280 characters |
 | `request_intents` | request_id, funding_intent_id, funding_token, visit_id, visitor_id, client_key, amount, exclusive, state (`open` / `closed`), expires_at | `funding_intent_id` unique; one per request and visit; an exclusive intent has no visit and any other has one; one open intent per single-use request (`exclusive`), by a partial unique index. `client_key` is an HMAC of the client's address, never the address. |
 | `request_payments` | request_id, funding_intent_id, amount, asset_id, payment_transaction_hash, settlement_transaction_hash, credited_at | `funding_intent_id` unique, so one credit counts once |
@@ -235,9 +251,12 @@ shape `{ "error": { "code", "message" } }`, and its message can be shown to the 
 | `GET /me`, `PUT /me/display-name` | receiver | The receiver's email, handle and display name |
 | `POST /auth/sign-out` | receiver | Ends the session |
 | `POST /me/handle` | receiver | Claim a handle, once |
-| `GET/PUT /me/payout-address` | receiver | Read or set the payout address, with the checks in section 6 |
+| `GET /handles/:handle` | receiver | Whether a handle is free, or why it cannot be one, so the app can say so while the receiver types. Signed in only, so handles cannot be listed for free. |
+| `GET/PUT /me/payout-address` | receiver | Read the Stellar payout address, or set the address on one network (`network`, default `stellar`), with the checks in section 6. A network Useroutr does not pay out on is refused (`network_unsupported`). |
+| `GET /me/payout-addresses` | receiver | Every active payout address, one per network |
+| `GET /me/payout-address/readiness` | receiver | For each asset a request can ask for, with its network, whether the receiver's address on that network can receive it now, and if not what to do: add an address on that network, or the wallet fix the same rule as creating a request gives, from one read of the Stellar account |
 | `GET/PUT/DELETE /me/pay-box` | receiver | Read, set or turn off the pay box: asset, fixed amount or the payer's choice, minimum. Saving it moves it to the current payout address. |
-| `GET /assets` | receiver | The assets a request can ask for, from Useroutr's list |
+| `GET /assets` | receiver | The assets a request can ask for, from Useroutr's list, each with its network and decimal places; the networks payers can pay from; and the Stellar network, so the app can link a Stellar payment to its transaction |
 | `POST /requests`, `GET /requests`, `PATCH /requests/:id`, `POST /requests/:id/close` | receiver | Create (single-use or reusable, listed or not, with an optional end date), list, list or unlist, and close requests |
 | `GET /profiles/:handle` | anyone | A handle page: name, verification mark, pay box and listed requests |
 | `GET /r/:id` | anyone | Not built: the web pay page renders the request on the server, and the app opens that page. |
@@ -370,7 +389,12 @@ The app has two environments, each tied to one Useroutr environment. They share 
 | Useroutr key | `ur_test_`; the SDK picks `api.sandbox.useroutr.com` from it | `ur_live_`; the SDK picks `api.useroutr.com` |
 | Checkout `baseUrl` | `https://api.sandbox.useroutr.com/v1/public` | `https://api.useroutr.com/v1/public` |
 | Database, webhook secret, WalletConnect project, email sender | its own | its own |
-| Host | a testnet subdomain, with a banner saying it is testnet | the app's domain |
+| Host | a testnet subdomain, with a banner saying it is testnet | the app's domain; `pomi.useroutr.com` until one is bought |
+
+Production runs on Vercel from `main`, with Neon's Postgres. `apps/web/vercel.json` holds the
+build (Turborepo, so the Prisma client is generated first), applies migrations on production
+builds only, over Neon's direct connection since the pooler cannot hold Prisma's migration lock, and runs the email job every five minutes as a backstop to the send that follows
+each webhook. It runs in the Threadflow team, on Vercel Pro, beside Useroutr's own site.
 
 Things to know about testnet:
 - **MetaMask's Stellar account does not work on testnet.** Use Freighter or xBull there.

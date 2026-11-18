@@ -30,7 +30,7 @@ export interface OutboxSenderDependencies {
   database: Database;
   emailDelivery: EmailDelivery;
   pushDelivery: PushDelivery;
-  useroutr: Pick<UseroutrGateway, "stellarAssets">;
+  useroutr: Pick<UseroutrGateway, "assets">;
   appUrl: string;
   network: StellarNetwork;
   operatorEmail: string | null;
@@ -138,7 +138,7 @@ export function createOutboxSender({
   }
 
   async function assetSymbol(assetId: string): Promise<string> {
-    const assets = await useroutr.stellarAssets();
+    const assets = await useroutr.assets();
     return assets.find((asset) => asset.id === assetId)?.symbol ?? assetId;
   }
 

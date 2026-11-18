@@ -1,12 +1,16 @@
 import "server-only";
-import { parseRequestAmount } from "@pomi/shared";
+import { assertAmountFits, parseRequestAmount } from "@pomi/shared";
 import { type Database } from "../database";
 import { newId } from "../ids";
 import { PayoutAddressRequiredError } from "../payout-addresses/payout-address-errors";
 import { activePayoutAddress } from "../payout-addresses/payout-address-repository";
 import { type PayoutAddressService } from "../payout-addresses/payout-address-service";
 import { ProfileNotFoundError } from "../profiles/profile-errors";
-import { type StellarAsset, type UseroutrGateway } from "../useroutr/useroutr-gateway";
+import {
+  type CatalogAsset,
+  type PaymentNetwork,
+  type UseroutrGateway,
+} from "../useroutr/useroutr-gateway";
 import {
   InvalidEndDateError,
   InvalidMinimumError,
@@ -30,8 +34,9 @@ import {
   userByHandle,
 } from "./request-repository";
 
-// Phase 1 asks for these two (docs/spec.md, section 12.2). The ids come
-// from Useroutr's own asset list, never from this file.
+// Phase 1 asks for these two (docs/spec.md, section 12.2), on every network
+// Useroutr pays receivers on. The ids and networks come from Useroutr's own
+// asset list, never from this file.
 const REQUESTABLE_SYMBOLS: ReadonlySet<string> = new Set(["USDC", "XLM"]);
 const NOTE_MAX_LENGTH = 280;
 
@@ -62,6 +67,8 @@ export interface ReceiverRequest {
   kind: RequestKind;
   amount: string | null;
   assetSymbol: string;
+  // Useroutr's network id for the asset: where the receiver is paid.
+  assetNetwork: string;
   note: string | null;
   listed: boolean;
   status: RequestStatus;
@@ -82,6 +89,8 @@ export interface PayerRequest {
   amount: string | null;
   minimumAmount: string | null;
   assetSymbol: string;
+  // Useroutr's network id for the asset: where the receiver is paid.
+  assetNetwork: string;
   note: string | null;
   status: RequestStatus;
   // Past its end date: it takes no more payments.
@@ -96,6 +105,8 @@ export interface ReceiverPayBox {
   open: boolean;
   assetId: string;
   assetSymbol: string;
+  // Useroutr's network id for the asset: where the receiver is paid.
+  assetNetwork: string;
   amount: string | null;
   minimumAmount: string | null;
   payoutAddress: string;
@@ -110,7 +121,7 @@ export interface HandlePage {
 
 export interface RequestServiceDependencies {
   database: Database;
-  useroutr: Pick<UseroutrGateway, "stellarAssets">;
+  useroutr: Pick<UseroutrGateway, "assets" | "paymentNetworks">;
   payoutAddresses: Pick<PayoutAddressService, "assertCanReceive">;
   now?: () => Date;
 }
@@ -123,12 +134,17 @@ export function createRequestService({
   payoutAddresses,
   now = () => new Date(),
 }: RequestServiceDependencies) {
-  async function requestableAssets(): Promise<StellarAsset[]> {
-    const assets = await useroutr.stellarAssets();
-    return assets.filter((asset) => REQUESTABLE_SYMBOLS.has(asset.symbol));
+  // Assets a receiver can be paid in: Useroutr pays them out, and Pomi can
+  // check an address on their network.
+  async function requestableAssets(): Promise<CatalogAsset[]> {
+    const assets = await useroutr.assets();
+    return assets.filter(
+      (asset) =>
+        asset.payout && asset.addressKind !== null && REQUESTABLE_SYMBOLS.has(asset.symbol),
+    );
   }
 
-  async function requestableAsset(assetId: string): Promise<StellarAsset> {
+  async function requestableAsset(assetId: string): Promise<CatalogAsset> {
     const asset = (await requestableAssets()).find((candidate) => candidate.id === assetId);
     if (asset === undefined) {
       throw new UnsupportedAssetError();
@@ -136,12 +152,12 @@ export function createRequestService({
     return asset;
   }
 
-  // The receiver's current address, checked on Stellar for the asset at the
-  // moment it is attached to a request.
-  async function payableAddress(userId: string, asset: StellarAsset) {
-    const payoutAddress = await activePayoutAddress(database, userId);
+  // The receiver's current address on the asset's network, checked for the
+  // asset at the moment it is attached to a request.
+  async function payableAddress(userId: string, asset: CatalogAsset) {
+    const payoutAddress = await activePayoutAddress(database, userId, asset.network);
     if (payoutAddress === null) {
-      throw new PayoutAddressRequiredError();
+      throw new PayoutAddressRequiredError(asset.network);
     }
     await payoutAddresses.assertCanReceive(payoutAddress.address, asset);
     return payoutAddress;
@@ -152,6 +168,7 @@ export function createRequestService({
     const note = parseNote(input.note);
     const endsAt = parseEndsAt(input.endsAt, now());
     const asset = await requestableAsset(input.assetId);
+    assertAmountFits(amount, asset.decimals);
     const payoutAddress = await payableAddress(userId, asset);
     return insertFixedRequest(database, {
       id: newId("req"),
@@ -168,12 +185,12 @@ export function createRequestService({
   }
 
   async function listRequests(userId: string): Promise<ReceiverRequest[]> {
-    const [requests, symbols] = await Promise.all([requestsOf(database, userId), assetSymbols()]);
+    const [requests, details] = await Promise.all([requestsOf(database, userId), assetDetails()]);
     return requests.map((request) => ({
       id: request.id,
       kind: request.kind,
       amount: request.amount?.toString() ?? null,
-      assetSymbol: symbols.get(request.assetId) ?? request.assetId,
+      ...describeAsset(details, request.assetId),
       note: request.note,
       listed: request.listed,
       status: request.status,
@@ -190,7 +207,7 @@ export function createRequestService({
 
   async function payerRequest(requestId: string): Promise<PayerRequest | null> {
     const request = await requestForPayer(database, requestId);
-    return request === null ? null : toPayerRequest(request, await assetSymbols());
+    return request === null ? null : toPayerRequest(request, await assetDetails());
   }
 
   async function handlePage(handleInput: string): Promise<HandlePage> {
@@ -198,16 +215,16 @@ export function createRequestService({
     if (user?.handle == null) {
       throw new ProfileNotFoundError();
     }
-    const [payBox, listed, symbols] = await Promise.all([
+    const [payBox, listed, details] = await Promise.all([
       openPayBoxForPayer(database, user.id),
       listedRequestsOf(database, user.id, now()),
-      assetSymbols(),
+      assetDetails(),
     ]);
     return {
       handle: user.handle,
       displayName: user.displayName,
-      payBox: payBox === null ? null : toPayerRequest(payBox, symbols),
-      listedRequests: listed.map((request) => toPayerRequest(request, symbols)),
+      payBox: payBox === null ? null : toPayerRequest(payBox, details),
+      listedRequests: listed.map((request) => toPayerRequest(request, details)),
     };
   }
 
@@ -236,14 +253,14 @@ export function createRequestService({
   }
 
   async function payBox(userId: string): Promise<ReceiverPayBox | null> {
-    const [box, symbols] = await Promise.all([payBoxOf(database, userId), assetSymbols()]);
+    const [box, details] = await Promise.all([payBoxOf(database, userId), assetDetails()]);
     if (box === null) {
       return null;
     }
     return {
       open: box.status === "OPEN",
       assetId: box.assetId,
-      assetSymbol: symbols.get(box.assetId) ?? box.assetId,
+      ...describeAsset(details, box.assetId),
       amount: box.amount?.toString() ?? null,
       minimumAmount: box.minimumAmount?.toString() ?? null,
       payoutAddress: box.payoutAddress.address,
@@ -255,6 +272,11 @@ export function createRequestService({
     const fixedAmount = isBlank(input.amount) ? null : parseRequestAmount(input.amount ?? "");
     const minimumAmount = parseMinimum(input.minimumAmount, fixedAmount);
     const asset = await requestableAsset(input.assetId);
+    for (const amount of [fixedAmount, minimumAmount]) {
+      if (amount !== null) {
+        assertAmountFits(amount, asset.decimals);
+      }
+    }
     const payoutAddress = await payableAddress(userId, asset);
     await database.$transaction(async (transaction) => {
       await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`paybox:${userId}`}, 0))`;
@@ -282,23 +304,25 @@ export function createRequestService({
     await closePayBoxOf(database, userId, now());
   }
 
-  // The symbol is shown wherever an amount is; Useroutr's list is the
-  // source of truth for it, and is cached by the gateway.
-  async function assetSymbols(): Promise<Map<string, string>> {
-    const assets = await useroutr.stellarAssets();
-    return new Map(assets.map((asset) => [asset.id, asset.symbol]));
+  // The symbol and network are shown wherever an amount is; Useroutr's list
+  // is the source of truth for both, and is cached by the gateway.
+  async function assetDetails(): Promise<AssetDetails> {
+    const assets = await useroutr.assets();
+    return new Map(
+      assets.map((asset) => [asset.id, { symbol: asset.symbol, network: asset.network }]),
+    );
   }
 
   function toPayerRequest(
     request: NonNullable<Awaited<ReturnType<typeof requestForPayer>>>,
-    symbols: Map<string, string>,
+    details: AssetDetails,
   ): PayerRequest {
     return {
       id: request.id,
       kind: request.kind,
       amount: request.amount?.toString() ?? null,
       minimumAmount: request.minimumAmount?.toString() ?? null,
-      assetSymbol: symbols.get(request.assetId) ?? request.assetId,
+      ...describeAsset(details, request.assetId),
       note: request.note,
       status: request.status,
       ended: request.endsAt !== null && request.endsAt <= now(),
@@ -310,8 +334,15 @@ export function createRequestService({
     };
   }
 
+  // Where a payer can pay from: Useroutr's catalog decides, so a network it
+  // adds shows up here without a change to Pomi.
+  function paymentNetworks(): Promise<PaymentNetwork[]> {
+    return useroutr.paymentNetworks();
+  }
+
   return {
     requestableAssets,
+    paymentNetworks,
     createRequest,
     listRequests,
     payerRequest,
@@ -322,6 +353,18 @@ export function createRequestService({
     setPayBox,
     closePayBox,
   };
+}
+
+type AssetDetails = Map<string, { symbol: string; network: string }>;
+
+// An asset Useroutr no longer lists is shown by its id. Every request made
+// before other networks existed is on Stellar, so that is the fallback.
+function describeAsset(
+  details: AssetDetails,
+  assetId: string,
+): { assetSymbol: string; assetNetwork: string } {
+  const asset = details.get(assetId);
+  return { assetSymbol: asset?.symbol ?? assetId, assetNetwork: asset?.network ?? "stellar" };
 }
 
 function parseNote(input: string | undefined): string | null {

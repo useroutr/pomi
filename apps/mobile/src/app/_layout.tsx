@@ -1,9 +1,19 @@
+import { BricolageGrotesque_500Medium } from "@expo-google-fonts/bricolage-grotesque/500Medium";
+import { BricolageGrotesque_600SemiBold } from "@expo-google-fonts/bricolage-grotesque/600SemiBold";
+import { BricolageGrotesque_700Bold } from "@expo-google-fonts/bricolage-grotesque/700Bold";
+import { useFonts } from "expo-font";
 import * as Notifications from "expo-notifications";
-import { router, Stack } from "expo-router";
+import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { useColors } from "@/components/ui";
 import { SessionProvider } from "@/lib/session";
+import { usePalette } from "@/theme/theme";
+
+// The splash stays up until the display font is ready, so no screen ever
+// draws in a fallback font first.
+void SplashScreen.preventAutoHideAsync();
+SplashScreen.setOptions({ duration: 250, fade: true });
 
 // A payment notification shows even while the app is open.
 Notifications.setNotificationHandler({
@@ -17,14 +27,25 @@ Notifications.setNotificationHandler({
 });
 
 export default function RootLayout() {
-  const colors = useColors();
+  const palette = usePalette();
+  const [fontsLoaded, fontError] = useFonts({
+    BricolageGrotesque_500Medium,
+    BricolageGrotesque_600SemiBold,
+    BricolageGrotesque_700Bold,
+  });
 
-  // Tapping "You were paid" opens that request.
+  useEffect(() => {
+    if (fontsLoaded || fontError !== null) {
+      void SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
+
+  // Tapping "You were paid" opens the moment itself.
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const requestId: unknown = response.notification.request.content.data?.requestId;
       if (typeof requestId === "string") {
-        router.push({ pathname: "/requests/[id]", params: { id: requestId } });
+        router.push({ pathname: "/paid/[id]", params: { id: requestId } });
       }
     });
     return () => {
@@ -32,27 +53,48 @@ export default function RootLayout() {
     };
   }, []);
 
+  if (!fontsLoaded && fontError === null) {
+    return null;
+  }
+
+  // Navigation draws its own backgrounds; giving it the palette avoids a
+  // white flash between screens in the dark theme.
+  const base = palette.scheme === "dark" ? DarkTheme : DefaultTheme;
+  const navigationTheme = {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: palette.text,
+      background: palette.background,
+      card: palette.background,
+      text: palette.text,
+      border: palette.line,
+    },
+  };
+
   return (
-    <SessionProvider>
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.foreground,
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      >
-        <Stack.Screen name="index" options={{ title: "Requests" }} />
-        <Stack.Screen name="sign-in" options={{ title: "Sign in", headerBackVisible: false }} />
-        <Stack.Screen
-          name="requests/new"
-          options={{ title: "New request", presentation: "modal" }}
-        />
-        <Stack.Screen name="requests/[id]" options={{ title: "Request" }} />
-        <Stack.Screen name="settings" options={{ title: "Settings" }} />
-        <Stack.Screen name="scan" options={{ title: "Scan a QR code", presentation: "modal" }} />
-        <Stack.Screen name="r/[id]" options={{ title: "" }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </SessionProvider>
+    <ThemeProvider value={navigationTheme}>
+      <SessionProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: palette.background },
+          }}
+        >
+          <Stack.Screen name="index" options={{ animation: "fade" }} />
+          <Stack.Screen name="(onboarding)" options={{ animation: "fade" }} />
+          <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
+          <Stack.Screen name="ask" options={{ presentation: "modal" }} />
+          <Stack.Screen
+            name="paid/[id]"
+            options={{ presentation: "fullScreenModal", animation: "fade" }}
+          />
+          <Stack.Screen name="scan" options={{ presentation: "fullScreenModal" }} />
+          <Stack.Screen name="page-qr" options={{ presentation: "modal" }} />
+          <Stack.Screen name="pay-with" options={{ presentation: "modal" }} />
+        </Stack>
+        <StatusBar style={palette.scheme === "dark" ? "light" : "dark"} />
+      </SessionProvider>
+    </ThemeProvider>
   );
 }

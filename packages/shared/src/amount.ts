@@ -35,3 +35,17 @@ export function parseRequestAmount(input: string): string {
   }
   return fraction === "" ? whole : `${whole}.${fraction}`;
 }
+
+// A parsed amount against the asset it is asked in: USDC on an EVM network
+// has 6 decimal places, fewer than Stellar's 7, and an amount with more
+// cannot be paid exactly there.
+export function assertAmountFits(amount: string, decimals: number): void {
+  const fraction = amount.split(".")[1] ?? "";
+  if (fraction.length > decimals) {
+    throw new InvalidAmountError(
+      decimals === 0
+        ? "Use a whole amount for this asset"
+        : `Use at most ${String(decimals)} decimal places for this asset`,
+    );
+  }
+}

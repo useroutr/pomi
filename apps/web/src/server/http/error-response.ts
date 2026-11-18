@@ -13,6 +13,7 @@ export type ErrorCode =
   | "invalid_address"
   | "account_missing"
   | "memo_required"
+  | "network_unsupported"
   | "asset_not_trusted"
   | "payout_address_required"
   | "invalid_amount"

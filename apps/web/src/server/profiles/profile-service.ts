@@ -1,5 +1,5 @@
 import "server-only";
-import { parseHandle } from "@pomi/shared";
+import { InvalidHandleError, parseHandle } from "@pomi/shared";
 import { Prisma } from "@/generated/prisma/client";
 import { type Database } from "../database";
 import {
@@ -55,5 +55,29 @@ export function createProfileService({ database }: { database: Database }) {
     return profile(userId);
   }
 
-  return { profile, claimHandle, setDisplayName };
+  // Lets the app say "free" or "taken" while the receiver types. The claim
+  // itself still decides, under the unique constraint.
+  async function handleAvailability(input: string): Promise<HandleAvailability> {
+    let handle: string;
+    try {
+      handle = parseHandle(input);
+    } catch (error) {
+      if (error instanceof InvalidHandleError) {
+        return { handle: input.trim().toLowerCase(), available: false, problem: error.message };
+      }
+      throw error;
+    }
+    const owner = await database.user.findUnique({ where: { handle }, select: { id: true } });
+    return owner === null
+      ? { handle, available: true, problem: null }
+      : { handle, available: false, problem: new HandleTakenError().message };
+  }
+
+  return { profile, claimHandle, setDisplayName, handleAvailability };
+}
+
+export interface HandleAvailability {
+  handle: string;
+  available: boolean;
+  problem: string | null;
 }

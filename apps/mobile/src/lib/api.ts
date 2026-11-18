@@ -81,19 +81,87 @@ export const meSchema = z.object({
   }),
 });
 
+// Older servers knew only Stellar, so a missing network means Stellar.
+const savedPayoutAddressSchema = z.object({
+  network: z.string().default("stellar"),
+  address: z.string(),
+  verified: z.boolean(),
+});
+
+export type SavedPayoutAddress = z.infer<typeof savedPayoutAddressSchema>;
+
 export const payoutAddressSchema = z.object({
-  payoutAddress: z.object({ address: z.string(), verified: z.boolean() }).nullable(),
+  payoutAddress: savedPayoutAddressSchema.nullable(),
+});
+
+// Every network the receiver has an address on, one each.
+export const payoutAddressesSchema = z.object({
+  payoutAddresses: z.array(savedPayoutAddressSchema),
 });
 
 export const assetsSchema = z.object({
-  assets: z.array(z.object({ id: z.string(), symbol: z.string() })),
+  // What a request can ask for, each on the network the receiver is paid on.
+  assets: z.array(
+    z.object({
+      id: z.string(),
+      symbol: z.string(),
+      network: z.string().default("stellar"),
+      decimals: z.number().int().min(0).default(7),
+    }),
+  ),
+  network: z.enum(["testnet", "mainnet"]),
+  // Where payers can pay from, as Useroutr lists it: networks and the tokens
+  // each takes, whatever the receiver is paid in.
+  payWith: z.array(z.object({ network: z.string(), symbols: z.array(z.string()) })).default([]),
 });
+
+export type PaymentNetwork = z.infer<typeof assetsSchema>["payWith"][number];
+
+export type RequestableAsset = z.infer<typeof assetsSchema>["assets"][number];
+
+export const handleAvailabilitySchema = z.object({
+  handle: z.string(),
+  available: z.boolean(),
+  problem: z.string().nullable(),
+});
+
+export const readinessSchema = z.object({
+  payoutAddresses: z.array(savedPayoutAddressSchema).default([]),
+  assets: z.array(
+    z.object({
+      id: z.string(),
+      symbol: z.string(),
+      network: z.string().default("stellar"),
+      ready: z.boolean(),
+      problem: z.string().nullable(),
+    }),
+  ),
+});
+
+export type Readiness = z.infer<typeof readinessSchema>;
+
+export const payBoxSchema = z.object({
+  payBox: z
+    .object({
+      open: z.boolean(),
+      assetId: z.string(),
+      assetSymbol: z.string(),
+      assetNetwork: z.string().default("stellar"),
+      amount: z.string().nullable(),
+      minimumAmount: z.string().nullable(),
+      payoutAddress: z.string(),
+    })
+    .nullable(),
+});
+
+export type PayBox = NonNullable<z.infer<typeof payBoxSchema>["payBox"]>;
 
 const requestSchema = z.object({
   id: z.string(),
   kind: z.enum(["SINGLE", "REUSABLE"]),
   amount: z.string().nullable(),
   assetSymbol: z.string(),
+  assetNetwork: z.string().default("stellar"),
   note: z.string().nullable(),
   listed: z.boolean(),
   status: z.enum(["OPEN", "PAID", "CLOSED"]),

@@ -88,9 +88,15 @@ model Session {
 
 // payout_addresses_one_active_per_user: a partial unique index on user_id.
 // payout_addresses_stellar_account: the address is a Stellar account (G...).
+// payout_addresses_address_format: a Stellar account (G...) on "stellar", an
+//   EVM address (0x...) elsewhere; payout_addresses_network_id.
+// payout_addresses_one_active_per_network: a partial unique index on
+//   (user_id, network) where active.
 model PayoutAddress {
   id         String    @id
   userId     String    @map("user_id")
+  // Useroutr's network id: a receiver keeps one active address per network.
+  network    String    @default("stellar")
   address    String
   active     Boolean   @default(true)
   verifiedAt DateTime? @map("verified_at")

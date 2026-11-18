@@ -20,6 +20,8 @@ import {
 import { createRequestService } from "./request-service";
 
 const database = testDatabase();
+// EIP-55's own example.
+const BASE_ADDRESS = "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
 let stellar: FakeStellar;
 
 function services() {
@@ -45,7 +47,10 @@ beforeEach(async () => {
     trustlines: [{ code: "USDC", issuer: USDC_ISSUER, authorized: true }],
     memoRequired: false,
   });
-  await services().payoutAddresses.setPayoutAddress("usr_1", RECEIVER_ACCOUNT);
+  await services().payoutAddresses.setPayoutAddress("usr_1", RECEIVER_ACCOUNT, {
+    network: "stellar",
+    addressKind: "stellar",
+  });
 });
 
 afterAll(async () => {
@@ -78,10 +83,14 @@ describe("creating a request", () => {
     expect(stored.payoutAddress.address).toBe(RECEIVER_ACCOUNT);
   });
 
-  it("offers USDC and XLM from Useroutr's list, and nothing else", async () => {
+  it("offers USDC and XLM wherever Useroutr can pay a receiver in them, and nothing else", async () => {
     const assets = await services().requests.requestableAssets();
 
-    expect(assets.map((asset) => asset.symbol)).toEqual(["USDC", "XLM"]);
+    expect(assets.map((asset) => [asset.symbol, asset.network])).toEqual([
+      ["USDC", "stellar"],
+      ["XLM", "stellar"],
+      ["USDC", "base"],
+    ]);
   });
 
   it.each([
@@ -105,6 +114,48 @@ describe("creating a request", () => {
     await expect(
       services().requests.createRequest("usr_2", { amount: "25", assetId: "asset_xlm_stellar" }),
     ).rejects.toThrow(PayoutAddressRequiredError);
+  });
+
+  it("asks for an address on the asset's own network, and pays the request there", async () => {
+    const { payoutAddresses, requests } = services();
+
+    await expect(
+      requests.createRequest("usr_1", { amount: "25", assetId: "asset_usdc_base" }),
+    ).rejects.toThrow(new PayoutAddressRequiredError("base"));
+
+    await payoutAddresses.setPayoutAddress("usr_1", BASE_ADDRESS, {
+      network: "base",
+      addressKind: "evm",
+    });
+    const created = await requests.createRequest("usr_1", {
+      amount: "25",
+      assetId: "asset_usdc_base",
+    });
+
+    const stored = await database.request.findUniqueOrThrow({
+      where: { id: created.id },
+      include: { payoutAddress: true },
+    });
+    expect(stored.payoutAddress).toMatchObject({ network: "base", address: BASE_ADDRESS });
+    await expect(requests.payerRequest(created.id)).resolves.toMatchObject({
+      assetSymbol: "USDC",
+      assetNetwork: "base",
+      payoutAddress: BASE_ADDRESS,
+    });
+  });
+
+  it("refuses more decimal places than the asset has", async () => {
+    await services().payoutAddresses.setPayoutAddress("usr_1", BASE_ADDRESS, {
+      network: "base",
+      addressKind: "evm",
+    });
+
+    await expect(
+      services().requests.createRequest("usr_1", {
+        amount: "1.1234567",
+        assetId: "asset_usdc_base",
+      }),
+    ).rejects.toThrow("Use at most 6 decimal places for this asset");
   });
 
   it("refuses USDC when the payout account does not trust it", async () => {
@@ -156,6 +207,7 @@ describe("listing and showing requests", () => {
       amount: "25",
       minimumAmount: null,
       assetSymbol: "USDC",
+      assetNetwork: "stellar",
       note: "Logo design",
       status: "OPEN",
       ended: false,
@@ -274,6 +326,7 @@ describe("the pay box", () => {
       open: true,
       assetId: "asset_usdc_stellar",
       assetSymbol: "USDC",
+      assetNetwork: "stellar",
       amount: null,
       minimumAmount: "5",
       payoutAddress: RECEIVER_ACCOUNT,

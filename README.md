@@ -20,6 +20,7 @@ the web, is being built.
 | `apps/mobile`     | Expo: the receiver's iOS and Android app                                                                     |
 | `packages/shared` | Code both apps use                                                                                           |
 | `docs/spec.md`    | What Pomi is, how it works, and the plan                                                                     |
+| `docs/design.md`  | How the mobile app looks and behaves, and where its assets come from                                         |
 
 ## Run it
 

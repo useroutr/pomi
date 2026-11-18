@@ -55,18 +55,24 @@ export function RequestList({
             {request.payments.map((payment) => (
               <p key={payment.creditedAt.toISOString()} className="small">
                 Paid {payment.amount} {request.assetSymbol} on {formatDate(payment.creditedAt)}
-                {payment.settlementTransactionHash !== null && (
-                  <>
-                    {" "}
-                    <a
-                      href={stellarExpertTransactionUrl(network, payment.settlementTransactionHash)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      View on Stellar
-                    </a>
-                  </>
-                )}
+                {/* Only a Stellar settlement is known to be a Stellar
+                    transaction, so only it links to a Stellar explorer. */}
+                {payment.settlementTransactionHash !== null &&
+                  request.assetNetwork === "stellar" && (
+                    <>
+                      {" "}
+                      <a
+                        href={stellarExpertTransactionUrl(
+                          network,
+                          payment.settlementTransactionHash,
+                        )}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        View on Stellar
+                      </a>
+                    </>
+                  )}
               </p>
             ))}
             {request.status === "OPEN" && (
