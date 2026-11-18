@@ -211,7 +211,10 @@
 }
 
 .list {
+  display: grid;
   grid-area: list;
+  gap: 16px;
+  min-width: 0;
 }
 
 .settings {
@@ -231,6 +234,141 @@
   margin: 0;
   color: var(--muted);
   line-height: 1.45;
+}
+
+/* Payments per day: one series in the brand violet, bars anchored to the
+   baseline with rounded tops and a gap between them; an empty day keeps a
+   thin tick so the run of days stays readable. */
+.chart {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 0;
+}
+
+.chartCaption {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chartBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 56px;
+  padding-bottom: 1px;
+  border-bottom: 1px solid var(--line);
+}
+
+.chartSlot {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  height: 100%;
+  min-width: 0;
+}
+
+.chartBar,
+.chartEmpty {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+}
+
+.chartBar {
+  min-height: 4px;
+  background: var(--violet);
+}
+
+.chartEmpty {
+  height: 2px;
+  background: var(--line);
+}
+
+.chartSlot:hover .chartBar {
+  background: var(--violet-deep);
+}
+
+.chartSlot:hover .chartEmpty {
+  background: var(--muted);
+}
+
+.chartAxis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Payments, newest first */
+
+.paymentList {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.payment {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.paymentList > .payment:first-child {
+  border-top: 0;
+}
+
+.more .paymentList > .payment:first-child {
+  border-top: 1px solid var(--line);
+}
+
+.paymentText {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.paymentText strong {
+  color: var(--success-ink);
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+
+.paymentText span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paymentLink {
+  flex: none;
+  color: var(--violet);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.more {
+  display: grid;
+  gap: 8px;
+}
+
+.more summary {
+  justify-self: start;
+  list-style: none;
+}
+
+.more summary::-webkit-details-marker {
+  display: none;
+}
+
+.more[open] summary {
+  display: none;
 }
 
 /* Requests, as rows of tokens */

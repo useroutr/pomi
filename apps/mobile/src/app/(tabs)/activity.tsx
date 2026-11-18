@@ -1,17 +1,33 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { FilterChips } from "@/components/filter-chips";
 import { Illustration } from "@/components/illustration";
 import { ListCard } from "@/components/list-card";
+import { PaymentRow } from "@/components/payment-row";
 import { ReceivedSummary } from "@/components/received-summary";
 import { RequestRow } from "@/components/request-row";
 import { TabScreen } from "@/components/screen";
+import { Segmented } from "@/components/segmented";
 import { RowSkeleton } from "@/components/skeleton";
 import { Text } from "@/components/text";
-import { type ReceiverRequest, requestsSchema } from "@/lib/api";
+import {
+  type ReceivedPayment,
+  receivedActivitySchema,
+  type ReceiverRequest,
+  requestsSchema,
+} from "@/lib/api";
 import { type Period, periodOf } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
+
+// Activity shows either every payment that arrived, the pay box's included,
+// or the requests the receiver made.
+type Shown = "payments" | "requests";
+
+const SHOWN: readonly { value: Shown; label: string }[] = [
+  { value: "payments", label: "Payments" },
+  { value: "requests", label: "Requests" },
+];
 
 type Filter = "all" | "waiting" | "paid" | "closed";
 
@@ -41,6 +57,15 @@ function lastActivity(request: ReceiverRequest): string {
   return request.payments.at(-1)?.creditedAt ?? request.createdAt;
 }
 
+function byPeriod<T>(items: T[], when: (item: T) => string): Map<Period, T[]> {
+  const groups = new Map<Period, T[]>();
+  for (const item of items) {
+    const period = periodOf(when(item));
+    groups.set(period, [...(groups.get(period) ?? []), item]);
+  }
+  return groups;
+}
+
 const EMPTY: Record<Filter, string> = {
   all: "Requests you make show up here.",
   waiting: "Nothing is waiting to be paid.",
@@ -50,65 +75,64 @@ const EMPTY: Record<Filter, string> = {
 
 export default function ActivityScreen() {
   const requests = useApi("/api/requests", requestsSchema);
+  const activity = useApi("/api/me/payments", receivedActivitySchema);
+  const [shown, setShown] = useState<Shown>("payments");
   const [filter, setFilter] = useState<Filter>("all");
   const list = requests.data?.requests;
-
-  const groups = new Map<Period, ReceiverRequest[]>();
-  for (const request of (list ?? [])
-    .filter((candidate) => matches(candidate, filter))
-    .sort((a, b) => lastActivity(b).localeCompare(lastActivity(a)))) {
-    const period = periodOf(lastActivity(request));
-    groups.set(period, [...(groups.get(period) ?? []), request]);
-  }
+  const received = activity.data;
 
   return (
-    <TabScreen refreshing={requests.refreshing} onRefresh={() => void requests.reload()}>
+    <TabScreen
+      refreshing={requests.refreshing || activity.refreshing}
+      onRefresh={() => {
+        void requests.reload();
+        void activity.reload();
+      }}
+    >
       <View style={styles.header}>
         <Text variant="title" accessibilityRole="header">
           Activity
         </Text>
       </View>
-      {list !== undefined && list.length > 0 && <ReceivedSummary requests={list} />}
+      {received !== null && <ReceivedSummary activity={received} />}
+      <Segmented options={SHOWN} value={shown} onChange={setShown} label="Show" stretch />
 
-      {list !== undefined && list.length > 0 && (
-        <FilterChips
-          options={FILTERS.map((option) => ({
-            ...option,
-            count: list.filter((request) => matches(request, option.value)).length,
-          }))}
-          value={filter}
-          onChange={setFilter}
-          label="Show"
+      {shown === "payments" ? (
+        <Payments
+          payments={received?.recent}
+          error={activity.error}
+          onOpen={(payment) => {
+            router.push({
+              pathname: "/paid/[id]",
+              params: { id: payment.requestId, payment: payment.id },
+            });
+          }}
         />
-      )}
-
-      {list === undefined ? (
-        requests.error === null ? (
-          <View style={styles.group}>
-            <RowSkeleton />
-            <RowSkeleton />
-            <RowSkeleton />
-          </View>
-        ) : (
-          <Text variant="callout" tone="danger">
-            {requests.error}
-          </Text>
-        )
-      ) : groups.size === 0 ? (
-        <View style={styles.empty}>
-          <Illustration name="coin" size={104} />
-          <Text variant="body" tone="secondary" style={styles.emptyText}>
-            {EMPTY[filter]}
-          </Text>
-        </View>
       ) : (
-        [...groups.entries()].map(([period, items]) => (
-          <View key={period} style={styles.group}>
-            <Text variant="label" tone="secondary" accessibilityRole="header" style={styles.period}>
-              {period}
-            </Text>
-            <ListCard>
-              {items.map((request) => (
+        <>
+          {list !== undefined && list.length > 0 && (
+            <FilterChips
+              options={FILTERS.map((option) => ({
+                ...option,
+                count: list.filter((request) => matches(request, option.value)).length,
+              }))}
+              value={filter}
+              onChange={setFilter}
+              label="Show"
+            />
+          )}
+          {list === undefined ? (
+            <Loading error={requests.error} />
+          ) : (
+            <Groups
+              groups={byPeriod(
+                list
+                  .filter((candidate) => matches(candidate, filter))
+                  .sort((a, b) => lastActivity(b).localeCompare(lastActivity(a))),
+                lastActivity,
+              )}
+              empty={EMPTY[filter]}
+              render={(request) => (
                 <RequestRow
                   key={request.id}
                   request={request}
@@ -116,13 +140,89 @@ export default function ActivityScreen() {
                     router.push({ pathname: "/requests/[id]", params: { id: request.id } });
                   }}
                 />
-              ))}
-            </ListCard>
-          </View>
-        ))
+              )}
+            />
+          )}
+        </>
       )}
     </TabScreen>
   );
+}
+
+function Payments({
+  payments,
+  error,
+  onOpen,
+}: {
+  payments: ReceivedPayment[] | undefined;
+  error: string | null;
+  onOpen: (payment: ReceivedPayment) => void;
+}) {
+  if (payments === undefined) {
+    return <Loading error={error} />;
+  }
+  return (
+    <Groups
+      // The server lists them newest first.
+      groups={byPeriod(payments, (payment) => payment.creditedAt)}
+      empty="Payments to your requests and your pay box show up here."
+      render={(payment) => (
+        <PaymentRow
+          key={payment.id}
+          payment={payment}
+          onPress={() => {
+            onOpen(payment);
+          }}
+        />
+      )}
+    />
+  );
+}
+
+function Loading({ error }: { error: string | null }) {
+  if (error !== null) {
+    return (
+      <Text variant="callout" tone="danger">
+        {error}
+      </Text>
+    );
+  }
+  return (
+    <View style={styles.group}>
+      <RowSkeleton />
+      <RowSkeleton />
+      <RowSkeleton />
+    </View>
+  );
+}
+
+function Groups<T>({
+  groups,
+  empty,
+  render,
+}: {
+  groups: Map<Period, T[]>;
+  empty: string;
+  render: (item: T) => ReactNode;
+}) {
+  if (groups.size === 0) {
+    return (
+      <View style={styles.empty}>
+        <Illustration name="coin" size={104} />
+        <Text variant="body" tone="secondary" style={styles.emptyText}>
+          {empty}
+        </Text>
+      </View>
+    );
+  }
+  return [...groups.entries()].map(([period, items]) => (
+    <View key={period} style={styles.group}>
+      <Text variant="label" tone="secondary" accessibilityRole="header" style={styles.period}>
+        {period}
+      </Text>
+      <ListCard>{items.map(render)}</ListCard>
+    </View>
+  ));
 }
 
 const styles = StyleSheet.create({

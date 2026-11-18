@@ -6,13 +6,19 @@ import { Illustration } from "@/components/illustration";
 import { ListCard } from "@/components/list-card";
 import { PageCard } from "@/components/page-card";
 import { PayWithStrip } from "@/components/pay-with-strip";
-import { PaymentRow, receivedPayments } from "@/components/payment-row";
+import { PaymentRow } from "@/components/payment-row";
 import { PressableScale } from "@/components/pressable-scale";
 import { RequestRow } from "@/components/request-row";
 import { TabScreen } from "@/components/screen";
 import { RowSkeleton, Skeleton } from "@/components/skeleton";
 import { Text } from "@/components/text";
-import { assetsSchema, meSchema, payoutAddressesSchema, requestsSchema } from "@/lib/api";
+import {
+  assetsSchema,
+  meSchema,
+  payoutAddressesSchema,
+  receivedActivitySchema,
+  requestsSchema,
+} from "@/lib/api";
 import { useApi } from "@/lib/use-api";
 import { radius, usePalette } from "@/theme/theme";
 
@@ -21,12 +27,14 @@ export default function HomeScreen() {
   const payout = useApi("/api/me/payout-addresses", payoutAddressesSchema);
   const requests = useApi("/api/requests", requestsSchema);
   const assets = useApi("/api/assets", assetsSchema);
+  // Payments come from their own list, so the pay box's are among them.
+  const activity = useApi("/api/me/payments", receivedActivitySchema);
 
   const user = me.data?.user;
   const firstName = user?.displayName?.split(" ")[0];
   const list = requests.data?.requests;
   const waiting = (list ?? []).filter((request) => request.status === "OPEN").slice(0, 3);
-  const paid = receivedPayments(list ?? []).slice(0, 3);
+  const paid = (activity.data?.recent ?? []).slice(0, 3);
 
   return (
     <TabScreen
@@ -35,6 +43,7 @@ export default function HomeScreen() {
         void me.reload();
         void payout.reload();
         void requests.reload();
+        void activity.reload();
       }}
     >
       <View style={styles.header}>
@@ -100,12 +109,12 @@ export default function HomeScreen() {
               <ListCard>
                 {paid.map((payment) => (
                   <PaymentRow
-                    key={`${payment.request.id}:${payment.creditedAt}`}
+                    key={payment.id}
                     payment={payment}
                     onPress={() => {
                       router.push({
-                        pathname: "/requests/[id]",
-                        params: { id: payment.request.id },
+                        pathname: "/paid/[id]",
+                        params: { id: payment.requestId, payment: payment.id },
                       });
                     }}
                   />

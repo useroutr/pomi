@@ -4,16 +4,22 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/app/components/app-header";
 import ui from "@/app/components/ui.module.css";
-import { payoutAddressService, profileService, requestService } from "@/server/app-services";
+import {
+  activityService,
+  payoutAddressService,
+  profileService,
+  requestService,
+} from "@/server/app-services";
 import { currentUser } from "@/server/auth/current-user";
 import { serverConfig } from "@/server/config";
 import styles from "./dashboard.module.css";
 import { NewRequestForm } from "./new-request-form";
 import { PageCard } from "./page-card";
-import { PaidSummary } from "./paid-summary";
 import { PayBoxForm } from "./pay-box-form";
+import { PaymentLog } from "./payment-log";
 import { PayoutAddressForm } from "./payout-address-form";
 import { DisplayNameForm } from "./profile-form";
+import { ReceivedOverview } from "./received-overview";
 import { RequestList } from "./request-list";
 import { SignOutButton } from "./sign-out-button";
 
@@ -56,13 +62,13 @@ export default async function DashboardPage() {
           />
           {catalog === null ? (
             <section className={[ui.card, styles.summary].join(" ")}>
-              <span className={styles.summaryLabel}>Paid to you</span>
+              <span className={styles.summaryLabel}>Received</span>
               <p className={styles.unavailable}>
-                Your payments cannot be shown while Useroutr is unreachable.
+                Your totals cannot be shown while Useroutr is unreachable.
               </p>
             </section>
           ) : (
-            <PaidSummary requests={catalog.requests} />
+            <ReceivedOverview activity={catalog.activity} />
           )}
         </div>
 
@@ -92,27 +98,51 @@ export default async function DashboardPage() {
             </section>
           )}
 
-          <section className={[ui.card, styles.list].join(" ")} aria-labelledby="requests-title">
-            <div className={styles.sectionHead}>
-              <h2 id="requests-title" className={ui.cardTitle}>
-                Your requests
-              </h2>
-              {catalog !== null && catalog.requests.length > 0 && (
-                <span className={ui.chip}>{catalog.requests.length}</span>
+          <div className={styles.list}>
+            <section className={ui.card} aria-labelledby="payments-title">
+              <div className={styles.sectionHead}>
+                <h2 id="payments-title" className={ui.cardTitle}>
+                  Payments
+                </h2>
+              </div>
+              {catalog === null ? (
+                <p className={styles.unavailable}>
+                  Your payments cannot be shown while Useroutr is unreachable.
+                </p>
+              ) : (
+                <PaymentLog
+                  payments={catalog.activity.recent}
+                  paymentsInAll={catalog.activity.totals.reduce(
+                    (sum, total) => sum + total.payments,
+                    0,
+                  )}
+                  network={config.stellar.network}
+                />
               )}
-            </div>
-            {catalog === null ? (
-              <p className={styles.unavailable}>
-                Your requests cannot be shown while Useroutr is unreachable.
-              </p>
-            ) : (
-              <RequestList
-                requests={catalog.requests}
-                appUrl={config.appUrl}
-                network={config.stellar.network}
-              />
-            )}
-          </section>
+            </section>
+
+            <section className={ui.card} aria-labelledby="requests-title">
+              <div className={styles.sectionHead}>
+                <h2 id="requests-title" className={ui.cardTitle}>
+                  Your requests
+                </h2>
+                {catalog !== null && catalog.requests.length > 0 && (
+                  <span className={ui.chip}>{catalog.requests.length}</span>
+                )}
+              </div>
+              {catalog === null ? (
+                <p className={styles.unavailable}>
+                  Your requests cannot be shown while Useroutr is unreachable.
+                </p>
+              ) : (
+                <RequestList
+                  requests={catalog.requests}
+                  appUrl={config.appUrl}
+                  network={config.stellar.network}
+                />
+              )}
+            </section>
+          </div>
 
           <div className={styles.settings}>
             <section className={ui.card} aria-labelledby="pay-box-title">
@@ -163,15 +193,17 @@ export default async function DashboardPage() {
 // reached the dashboard still loads, and says so where it matters.
 async function useroutrCatalog(userId: string) {
   try {
-    const [assets, requests, payBox] = await Promise.all([
+    const [assets, requests, payBox, activity] = await Promise.all([
       requestService().requestableAssets(),
       requestService().listRequests(userId),
       requestService().payBox(userId),
+      activityService().receivedActivity(userId),
     ]);
     return {
       assets: assets.map(({ id, symbol, network }) => ({ id, symbol, network })),
       requests,
       payBox,
+      activity,
     };
   } catch (error) {
     if (error instanceof UseroutrError) {

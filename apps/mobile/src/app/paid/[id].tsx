@@ -7,11 +7,17 @@ import { Animated, StyleSheet, View } from "react-native";
 import { AssetMark } from "@/components/asset-logo";
 import { Button, IconButton } from "@/components/button";
 import { Illustration } from "@/components/illustration";
-import { requestTitle } from "@/components/request-row";
+import { paymentTitle } from "@/components/payment-row";
 import { Screen, ScreenHeader } from "@/components/screen";
 import { Skeleton } from "@/components/skeleton";
 import { Text } from "@/components/text";
-import { assetsSchema, requestsSchema } from "@/lib/api";
+import {
+  assetsSchema,
+  type ReceivedPayment,
+  receivedActivitySchema,
+  type ReceiverRequest,
+  requestsSchema,
+} from "@/lib/api";
 import { transactionUrl } from "@/lib/config";
 import { formatDateTime } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
@@ -23,15 +29,22 @@ import { radius, usePalette } from "@/theme/theme";
 // "You were paid": where a payment notification leads, painted in the brand
 // colors like the payment moments of the big money apps. Only what Pomi has
 // recorded as credited is shown here, never what a payer claims.
+// Opened with a request id: from a notification, which names the request
+// (the pay box is one too), or from a list, which also names the payment.
 export default function PaidScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, payment: paymentId } = useLocalSearchParams<{ id: string; payment?: string }>();
+  const activity = useApi("/api/me/payments", receivedActivitySchema);
   const requests = useApi("/api/requests", requestsSchema);
   const assets = useApi("/api/assets", assetsSchema);
+  const recent = activity.data?.recent;
+  // The payment named, or else the request's latest: the list is newest first.
+  const payment =
+    recent?.find((candidate) => candidate.id === paymentId) ??
+    recent?.find((candidate) => candidate.requestId === id);
   const request = requests.data?.requests.find((candidate) => candidate.id === id);
-  const payment = request?.payments.at(-1);
   // Only a Stellar settlement is known to be a Stellar transaction, so only
   // it links to a Stellar explorer.
-  const network = request?.assetNetwork === "stellar" ? assets.data?.network : undefined;
+  const network = payment?.assetNetwork === "stellar" ? assets.data?.network : undefined;
   const hash = payment?.settlementTransactionHash ?? null;
 
   useEffect(() => {
@@ -70,9 +83,9 @@ export default function PaidScreen() {
       <ScreenHeader
         trailing={<IconButton icon="close" label="Close" tone="onDark" onPress={close} />}
       />
-      {request === undefined || payment === undefined ? (
+      {payment === undefined ? (
         <View style={styles.center}>
-          {requests.data === null ? (
+          {activity.data === null ? (
             <Skeleton style={styles.lineSkeleton} />
           ) : (
             <Text variant="body" style={[styles.centerText, styles.white]}>
@@ -99,25 +112,19 @@ export default function PaidScreen() {
                   {formatAmount(payment.amount)}
                 </Text>
                 <Text variant="title" style={styles.whiteSoft}>
-                  {request.assetSymbol}
+                  {payment.assetSymbol}
                 </Text>
               </View>
               <Text variant="body" style={[styles.centerText, styles.whiteSoft]}>
-                for {requestTitle(request)}
+                for {payment.payBox ? "your pay box" : paymentTitle(payment)}
               </Text>
             </View>
           </View>
           <Details
-            assetSymbol={request.assetSymbol}
-            assetNetwork={request.assetNetwork}
+            assetSymbol={payment.assetSymbol}
+            assetNetwork={payment.assetNetwork}
             when={formatDateTime(payment.creditedAt)}
-            status={
-              request.kind === "REUSABLE"
-                ? `Open, paid ${String(request.payments.length)}×`
-                : request.status === "PAID"
-                  ? "Closed, paid once"
-                  : "Open"
-            }
+            status={statusOf(payment, request)}
           />
         </>
       )}
@@ -143,6 +150,21 @@ function Arrival() {
   );
 }
 
+// What became of what was paid: the pay box stays open; a request says
+// whether it took this payment and closed. Null until the request is known.
+function statusOf(payment: ReceivedPayment, request: ReceiverRequest | undefined): string | null {
+  if (payment.payBox) {
+    return "Your pay box, still open";
+  }
+  if (request === undefined) {
+    return null;
+  }
+  if (request.kind === "REUSABLE") {
+    return `Open, paid ${String(request.payments.length)}×`;
+  }
+  return request.status === "PAID" ? "Closed, paid once" : "Open";
+}
+
 function Details({
   assetSymbol,
   assetNetwork,
@@ -152,7 +174,7 @@ function Details({
   assetSymbol: string;
   assetNetwork: string;
   when: string;
-  status: string;
+  status: string | null;
 }) {
   const palette = usePalette();
   return (
@@ -182,15 +204,19 @@ function Details({
           {when}
         </Text>
       </View>
-      <View style={[styles.divider, { backgroundColor: palette.line }]} />
-      <View style={styles.detail}>
-        <Text variant="callout" tone="secondary">
-          Request
-        </Text>
-        <Text variant="callout" style={styles.detailValue}>
-          {status}
-        </Text>
-      </View>
+      {status !== null && (
+        <>
+          <View style={[styles.divider, { backgroundColor: palette.line }]} />
+          <View style={styles.detail}>
+            <Text variant="callout" tone="secondary">
+              Request
+            </Text>
+            <Text variant="callout" style={styles.detailValue}>
+              {status}
+            </Text>
+          </View>
+        </>
+      )}
     </View>
   );
 }

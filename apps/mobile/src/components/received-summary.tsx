@@ -1,83 +1,107 @@
 import { StyleSheet, View } from "react-native";
-import { sumAmounts } from "@pomi/shared";
-import { type ReceiverRequest } from "@/lib/api";
+import { formatAmount } from "@pomi/shared";
+import { type ReceivedActivity } from "@/lib/api";
 import { radius } from "@/theme/theme";
 import { AssetLogo } from "./asset-logo";
-import { receivedPayments } from "./payment-row";
 import { Text } from "./text";
 import { VibrantSurface } from "./vibrant-surface";
 
 // At most this many assets get a line; the rest are counted.
 const SHOWN_ASSETS = 3;
 
-// What reached the receiver this calendar month, one line per asset (amounts
-// in different assets are never added together), on Activity's one vibrant
-// card.
+function paymentsLabel(count: number): string {
+  return count === 1 ? "1 payment" : `${String(count)} payments`;
+}
+
+// What reached the receiver this month and in all, one line per asset
+// (amounts in different assets are never added together), the pay box
+// included, on Activity's one vibrant card. Months are UTC, as the server
+// counts them.
 export function ReceivedSummary({
-  requests,
+  activity,
   now = new Date(),
 }: {
-  requests: ReceiverRequest[];
+  activity: ReceivedActivity;
   now?: Date;
 }) {
-  const payments = receivedPayments(requests).filter((payment) => {
-    const credited = new Date(payment.creditedAt);
-    return credited.getFullYear() === now.getFullYear() && credited.getMonth() === now.getMonth();
-  });
-  const bySymbol = new Map<string, string[]>();
-  for (const payment of payments) {
-    const symbol = payment.request.assetSymbol;
-    bySymbol.set(symbol, [...(bySymbol.get(symbol) ?? []), payment.amount]);
-  }
-  const totals = [...bySymbol.entries()].map(([symbol, amounts]) => ({
-    symbol,
-    total: sumAmounts(amounts),
-  }));
-  const waiting = requests.filter((request) => request.status === "OPEN").length;
-  const month = now.toLocaleDateString(undefined, { month: "long" });
+  const month = activity.totals.filter((total) => total.paymentsThisMonth > 0);
+  const paymentsThisMonth = month.reduce((sum, total) => sum + total.paymentsThisMonth, 0);
+  const paymentsInAll = activity.totals.reduce((sum, total) => sum + total.payments, 0);
+  const monthName = now.toLocaleDateString(undefined, { month: "long", timeZone: "UTC" });
 
   return (
     <VibrantSurface radius={radius.card} style={styles.card}>
       <View accessibilityRole="summary" style={styles.content}>
         <Text variant="label" style={styles.soft}>
-          Paid to you in {month}
+          Received in {monthName}
         </Text>
-        {totals.length === 0 ? (
+        {month.length === 0 ? (
           <Text variant="title" style={styles.white}>
             Nothing yet
           </Text>
         ) : (
           <View style={styles.totals}>
-            {totals.slice(0, SHOWN_ASSETS).map(({ symbol, total }) => (
-              <View key={symbol} style={styles.total}>
-                <AssetLogo symbol={symbol} size={26} />
+            {month.slice(0, SHOWN_ASSETS).map((total) => (
+              <View key={`${total.assetSymbol}:${total.assetNetwork}`} style={styles.total}>
+                <AssetLogo symbol={total.assetSymbol} size={26} />
                 <Text
                   variant="title"
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   style={[styles.shrink, styles.white]}
                 >
-                  {total}
+                  {formatAmount(total.thisMonth)}
                 </Text>
                 <Text variant="headline" style={styles.soft}>
-                  {symbol}
+                  {total.assetSymbol}
                 </Text>
               </View>
             ))}
-            {totals.length > SHOWN_ASSETS && (
+            {month.length > SHOWN_ASSETS && (
               <Text variant="footnote" style={styles.soft}>
-                and {String(totals.length - SHOWN_ASSETS)} more
+                and {String(month.length - SHOWN_ASSETS)} more
               </Text>
             )}
           </View>
         )}
+        <DayBars days={activity.days} />
         <Text variant="footnote" style={styles.soft}>
-          {payments.length === 1 ? "1 payment" : `${String(payments.length)} payments`}
-          {" · "}
-          {waiting === 1 ? "1 request waiting" : `${String(waiting)} requests waiting`}
+          {paymentsLabel(paymentsThisMonth)} this month
+          {activity.totals.length > 0 &&
+            ` · in all ${activity.totals
+              .slice(0, SHOWN_ASSETS)
+              .map((total) => `${formatAmount(total.total)} ${total.assetSymbol}`)
+              .join(", ")} from ${paymentsLabel(paymentsInAll)}`}
         </Text>
       </View>
     </VibrantSurface>
+  );
+}
+
+// Payments per day for the last month, today last: one white bar a day on
+// the card, an empty day a faint tick.
+function DayBars({ days }: { days: ReceivedActivity["days"] }) {
+  const total = days.reduce((sum, day) => sum + day.payments, 0);
+  const most = Math.max(1, ...days.map((day) => day.payments));
+  return (
+    <View
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={`${paymentsLabel(total)} in the last ${String(days.length)} days`}
+      style={styles.bars}
+    >
+      {days.map((day) => (
+        <View key={day.date} style={styles.slot}>
+          <View
+            style={
+              day.payments === 0
+                ? styles.empty
+                : [styles.bar, { height: `${String((day.payments / most) * 100)}%` }]
+            }
+          />
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -89,4 +113,13 @@ const styles = StyleSheet.create({
   totals: { gap: 6 },
   total: { flexDirection: "row", alignItems: "center", gap: 10 },
   shrink: { flexShrink: 1 },
+  bars: { flexDirection: "row", alignItems: "flex-end", gap: 2, height: 40, marginTop: 4 },
+  slot: { flex: 1, height: "100%", justifyContent: "flex-end" },
+  bar: {
+    minHeight: 4,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    backgroundColor: "#FFFFFF",
+  },
+  empty: { height: 2, borderRadius: 1, backgroundColor: "rgba(255, 255, 255, 0.35)" },
 });

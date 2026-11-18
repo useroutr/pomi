@@ -10,13 +10,13 @@ type in `apps/mobile/src/theme/type.ts`, components in `apps/mobile/src/componen
 Vibrant the way shipped money apps are, and clear about money, like a bank. The layouts follow
 apps people already use: Home is built like Revolut's (a colored card with its actions on it), the amount screen like Cash App's (the whole screen in the brand color, the number its only
 subject), and the paid moment like Monzo's and Cash App's. The welcome screen opens on the
-brand gradient with floating 3D objects; Activity leads with "Paid to you this month" per
-asset; requests and payments are listed in one rounded card per group, as banking apps list
-transactions; a request's detail repeats Home's gradient card and round actions; You is a
+brand gradient with floating 3D objects; Activity leads with what was received this month per
+asset, then payments or requests, each listed in one rounded card per group, as banking apps
+list transactions; a request's detail repeats Home's gradient card and round actions; You is a
 profile header over settings rows with colored icon tiles. Four things carry the brand:
 
-- **The vibrant card.** Each tab has one card in the brand colors: the page card on Home, "Paid
-  to you" on Activity, the profile on You (`VibrantSurface`). Its ground is a mesh of soft
+- **The vibrant card.** Each tab has one card in the brand colors: the page card on Home,
+  "Received" on Activity, the profile on You (`VibrantSurface`). Its ground is a mesh of soft
   radial pools (light violet top left, pink top right, orange bottom right, deep indigo bottom
   left, `VIBRANT_MESH`), which reads as colored light seen through frosted glass, with a fine
   film grain over it: a 128-point tile drawn at 1x, 2x and 3x by
@@ -126,12 +126,30 @@ then their listed requests as token rows.
 code in large type. A first code also creates the account, and the card says so.
 
 **Dashboard.** Laid out as Uniswap lays out a portfolio. On top, the receiver's page on the
-vibrant card (link, copy, open and a QR code dialog) beside what reached them this month, one
-line per asset and network, added without floats (`sumAmounts` in `@pomi/shared`). Below,
+vibrant card (link, copy, open and a QR code dialog) beside what was received (see below): this
+month and in all, and payments per day for 30 days. Below, every payment as a log, then
 requests as token rows with their status, payments and actions, beside a new-request card
 shaped like a swap card's top box and the settings. Until an address exists, where to be paid
 takes the new-request card's place, since nothing can be asked for without it. On phones the
-order is: page, summary, new request, requests, settings.
+order is: page, summary, new request, payments, requests, settings.
+
+## What a receiver has been paid
+
+One record, `GET /api/me/payments` (`apps/web/src/server/activity`), feeds the dashboard and the
+app's Activity, Home and "You were paid" screens. It covers every payment to any of the
+receiver's requests, the pay box's included: the request list leaves the pay box out, since it
+has its own settings, so payments read from that list would miss it.
+
+- **Totals** per asset and network, all time and this month, summed by Postgres over the stored
+  NUMERIC amounts, so they are exact. Amounts in different assets are never added together.
+- **The latest 50 payments**, newest first, each in its own asset: the pay box is edited in
+  place, so a payment to it may be in an asset the box no longer asks for.
+- **Payments per day** for the last 30 days, a count, since a count can be compared across
+  assets and an amount cannot. The chart is one series in the brand violet; pointing at a bar
+  names its day.
+
+Months and days are UTC, as every date on the dashboard. A payment notification names its
+request, the pay box included, and "You were paid" finds the payment in this record.
 
 ## Pasting what was copied elsewhere
 
