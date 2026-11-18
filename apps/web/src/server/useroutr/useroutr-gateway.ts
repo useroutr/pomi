@@ -7,12 +7,32 @@ import {
   type WebhookEvent,
 } from "@useroutr/sdk";
 
-export interface StellarAsset {
+// One entry of Useroutr's asset list, as Pomi uses it.
+export interface CatalogAsset {
   id: string;
   symbol: string;
-  code: string;
-  // Null for XLM, the native asset.
-  issuer: string | null;
+  // Useroutr's network id, such as "stellar", "base" or "arbitrum".
+  network: string;
+  decimals: number;
+  // Whether a request can pay a receiver in this asset. Every Stellar asset
+  // can; an asset on another network when Useroutr says one of its rails
+  // delivers it there.
+  payout: boolean;
+  // How an address on this asset's network is written, to check the
+  // receiver's; null for a kind Pomi cannot check yet.
+  addressKind: "stellar" | "evm" | null;
+  // A Stellar asset's identity, for trustline checks; null elsewhere.
+  stellar: { code: string; issuer: string | null } | null;
+}
+
+const EVM_CONTRACT = /^0x[0-9a-fA-F]{40}$/;
+
+// A network a payer can pay from, with the assets Useroutr accepts on it.
+// Payers can bring any of these, whatever the receiver is paid in.
+export interface PaymentNetwork {
+  // Useroutr's network id, such as "stellar", "base" or "arbitrum".
+  network: string;
+  symbols: string[];
 }
 
 export interface NewFundingIntent {
@@ -31,7 +51,8 @@ export interface CreatedFundingIntent {
 }
 
 export interface UseroutrGateway {
-  stellarAssets(): Promise<StellarAsset[]>;
+  assets(): Promise<CatalogAsset[]>;
+  paymentNetworks(): Promise<PaymentNetwork[]>;
   createFundingIntent(intent: NewFundingIntent): Promise<CreatedFundingIntent>;
   fundingIntentStatus(fundingIntentId: string): Promise<FundingIntentStatus>;
   constructWebhookEvent(
@@ -78,30 +99,66 @@ export function createUseroutrGateway(options: UseroutrGatewayOptions): Useroutr
   const sleep =
     options.sleep ??
     ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
-  let cachedAssets: { assets: StellarAsset[]; fetchedAt: number } | undefined;
+  type ListedAsset = Awaited<ReturnType<typeof client.assets.list>>["data"][number];
+  let cachedCatalog: { assets: CatalogAsset[]; fetchedAt: number } | undefined;
 
-  async function stellarAssets(): Promise<StellarAsset[]> {
-    if (cachedAssets !== undefined && Date.now() - cachedAssets.fetchedAt < ASSET_CACHE_MS) {
-      return cachedAssets.assets;
+  async function assets(): Promise<CatalogAsset[]> {
+    if (cachedCatalog !== undefined && Date.now() - cachedCatalog.fetchedAt < ASSET_CACHE_MS) {
+      return cachedCatalog.assets;
     }
-    const catalog = await client.assets.list();
-    const assets = catalog.data.flatMap((asset) =>
-      "stellar_asset" in asset
-        ? [{ id: asset.id, symbol: asset.symbol, code: asset.code, issuer: asset.issuer }]
-        : [],
-    );
-    cachedAssets = { assets, fetchedAt: Date.now() };
-    return assets;
+    const listed = await client.assets.list();
+    const catalog = listed.data.map(toCatalogAsset);
+    cachedCatalog = { assets: catalog, fetchedAt: Date.now() };
+    return catalog;
+  }
+
+  function toCatalogAsset(asset: ListedAsset): CatalogAsset {
+    const base = {
+      id: asset.id,
+      symbol: asset.symbol,
+      network: asset.network,
+      decimals: asset.decimals,
+    };
+    if ("stellar_asset" in asset) {
+      return {
+        ...base,
+        payout: true,
+        addressKind: "stellar",
+        stellar: { code: asset.code, issuer: asset.issuer },
+      };
+    }
+    return {
+      ...base,
+      // Read as Useroutr lists it, so a network it starts paying out to needs
+      // no change here.
+      payout: "destination" in asset && asset.destination === true,
+      addressKind: EVM_CONTRACT.test(asset.contract) ? "evm" : null,
+      stellar: null,
+    };
+  }
+
+  async function paymentNetworks(): Promise<PaymentNetwork[]> {
+    const byNetwork = new Map<string, Set<string>>();
+    for (const asset of await assets()) {
+      const symbols = byNetwork.get(asset.network) ?? new Set<string>();
+      symbols.add(asset.symbol);
+      byNetwork.set(asset.network, symbols);
+    }
+    return Array.from(byNetwork, ([network, symbols]) => ({ network, symbols: [...symbols] }));
   }
 
   async function createFundingIntent(intent: NewFundingIntent): Promise<CreatedFundingIntent> {
+    const asset = (await assets()).find((candidate) => candidate.id === intent.assetId);
+    if (asset === undefined) {
+      throw new UseroutrResponseError(`Useroutr no longer lists ${intent.assetId}`);
+    }
     // Every field is derived from the request, never from the clock, so two
     // visitors sending the same key send the same body and Useroutr replays
     // one intent to both instead of refusing the second.
     const body = {
       amount: intent.amount,
       asset: intent.assetId,
-      destination: { network: "stellar", asset: intent.assetId, address: intent.payoutAddress },
+      destination: { network: asset.network, asset: intent.assetId, address: intent.payoutAddress },
       reference: intent.reference,
     };
     let waitedMs = 0;
@@ -143,7 +200,8 @@ export function createUseroutrGateway(options: UseroutrGatewayOptions): Useroutr
   }
 
   return {
-    stellarAssets,
+    assets,
+    paymentNetworks,
     createFundingIntent,
     fundingIntentStatus,
     constructWebhookEvent: (payload, signatureHeader, eventId) =>

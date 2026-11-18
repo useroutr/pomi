@@ -4,12 +4,20 @@ import { type Database } from "../database";
 
 type Client = Database | Prisma.TransactionClient;
 
-const payoutAddressFields = { id: true, address: true, verifiedAt: true } as const;
+const payoutAddressFields = { id: true, network: true, address: true, verifiedAt: true } as const;
 
-export function activePayoutAddress(client: Client, userId: string) {
+export function activePayoutAddress(client: Client, userId: string, network: string) {
   return client.payoutAddress.findFirst({
+    where: { userId, network, active: true },
+    select: payoutAddressFields,
+  });
+}
+
+export function activePayoutAddresses(client: Client, userId: string) {
+  return client.payoutAddress.findMany({
     where: { userId, active: true },
     select: payoutAddressFields,
+    orderBy: { createdAt: "asc" },
   });
 }
 
@@ -19,16 +27,16 @@ export async function lockPayoutAddresses(client: Prisma.TransactionClient, user
   await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`payout:${userId}`}, 0))`;
 }
 
-export async function deactivatePayoutAddresses(client: Client, userId: string) {
+export async function deactivatePayoutAddress(client: Client, userId: string, network: string) {
   await client.payoutAddress.updateMany({
-    where: { userId, active: true },
+    where: { userId, network, active: true },
     data: { active: false },
   });
 }
 
 export function insertActivePayoutAddress(
   client: Client,
-  payoutAddress: { id: string; userId: string; address: string; createdAt: Date },
+  payoutAddress: { id: string; userId: string; network: string; address: string; createdAt: Date },
 ) {
   return client.payoutAddress.create({
     data: { ...payoutAddress, active: true },

@@ -1,3 +1,4 @@
+import { networkName } from "@pomi/shared";
 import { type StellarNetwork } from "../config";
 
 export class PayoutAccountMissingError extends Error {
@@ -30,8 +31,16 @@ export class PayoutAssetNotTrustedError extends Error {
 }
 
 export class PayoutAddressRequiredError extends Error {
-  constructor() {
-    super("Add the Stellar address you want to be paid at first.");
+  constructor(network: string) {
+    super(`Add the ${networkName(network)} address you want to be paid at first.`);
     this.name = "PayoutAddressRequiredError";
+  }
+}
+
+// Useroutr pays receivers only on the networks its asset list marks payable.
+export class PayoutNetworkUnsupportedError extends Error {
+  constructor(network: string) {
+    super(`Pomi can't pay you on ${networkName(network)} yet.`);
+    this.name = "PayoutNetworkUnsupportedError";
   }
 }

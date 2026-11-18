@@ -11,6 +11,7 @@ if (databaseUrl === undefined) {
 const database = createDatabase(databaseUrl);
 
 const STELLAR_ACCOUNT = `G${"A".repeat(55)}`;
+const EVM_ADDRESS = `0x${"a".repeat(40)}`;
 
 function createUser(id: string, overrides: Partial<Prisma.UserUncheckedCreateInput> = {}) {
   return database.user.create({ data: { id, email: `${id}@example.com`, ...overrides } });
@@ -221,15 +222,28 @@ describe("receivers", () => {
     );
   });
 
-  it("refuses a payout address that is not a Stellar account", async () => {
+  it("refuses a payout address not written the way its network writes accounts", async () => {
     await expect(
       database.payoutAddress.create({
         data: { id: "addr_1", userId: "usr_1", address: `C${"A".repeat(55)}` },
       }),
-    ).rejects.toThrow("payout_addresses_stellar_account");
+    ).rejects.toThrow("payout_addresses_address_format");
+    await expect(
+      database.payoutAddress.create({
+        data: { id: "addr_2", userId: "usr_1", network: "base", address: STELLAR_ACCOUNT },
+      }),
+    ).rejects.toThrow("payout_addresses_address_format");
+    await expect(
+      database.payoutAddress.create({
+        data: { id: "addr_3", userId: "usr_1", network: "Base", address: EVM_ADDRESS },
+      }),
+    ).rejects.toThrow("payout_addresses_network_id");
   });
 
-  it("keeps one active payout address per receiver", async () => {
+  it("keeps one active payout address per receiver and network", async () => {
+    await database.payoutAddress.create({
+      data: { id: "addr_evm", userId: "usr_1", network: "base", address: EVM_ADDRESS },
+    });
     await database.payoutAddress.create({
       data: { id: "addr_1", userId: "usr_1", address: STELLAR_ACCOUNT, active: false },
     });
@@ -241,7 +255,7 @@ describe("receivers", () => {
       database.payoutAddress.create({
         data: { id: "addr_3", userId: "usr_1", address: STELLAR_ACCOUNT },
       }),
-    ).rejects.toThrow("payout_addresses_one_active_per_user");
+    ).rejects.toThrow("payout_addresses_one_active_per_network");
   });
 });
 

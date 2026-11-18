@@ -1,4 +1,4 @@
-import { shortenStellarAccount } from "@pomi/shared";
+import { networkName, shortenAddress } from "@pomi/shared";
 import { type PayerRequest } from "@/server/requests/request-service";
 
 // What a payer sees before paying: who asks, how much, and where it goes.
@@ -18,7 +18,8 @@ export function RequestSummary({ request }: { request: PayerRequest }) {
           link in it could pass for Pomi's own. */}
       {request.note !== null && <p className="note">{request.note}</p>}
       <p className="muted small">
-        Paid on Stellar to {shortenStellarAccount(request.payoutAddress)}
+        Paid on {networkName(request.assetNetwork)} to{" "}
+        {shortenAddress(request.assetNetwork, request.payoutAddress)}
         {request.payoutAddressVerified
           ? ", a verified address"
           : ", an address the receiver pasted"}
