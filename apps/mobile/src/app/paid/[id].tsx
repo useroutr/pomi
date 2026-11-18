@@ -1,4 +1,4 @@
-import { networkName } from "@pomi/shared";
+import { formatAmount, networkName } from "@pomi/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as WebBrowser from "expo-web-browser";
@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/skeleton";
 import { Text } from "@/components/text";
 import { assetsSchema, requestsSchema } from "@/lib/api";
 import { transactionUrl } from "@/lib/config";
-import { formatAmount, formatDateTime } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { useReduceMotion } from "@/lib/reduce-motion";
 import { useApi } from "@/lib/use-api";

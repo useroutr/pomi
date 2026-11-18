@@ -1,4 +1,4 @@
-import { networkName, parseRequestAmount } from "@pomi/shared";
+import { formatAmount, networkName, parseRequestAmount } from "@pomi/shared";
 import { router, useFocusEffect } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useState } from "react";
@@ -26,7 +26,6 @@ import {
   type RequestableAsset,
 } from "@/lib/api";
 import { requestLink } from "@/lib/config";
-import { formatAmount } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { networkList } from "@/lib/networks";
 import { useSession } from "@/lib/session";

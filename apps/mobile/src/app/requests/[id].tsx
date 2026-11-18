@@ -1,4 +1,4 @@
-import { networkName } from "@pomi/shared";
+import { formatAmount, networkName, sumAmounts } from "@pomi/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
@@ -17,7 +17,7 @@ import { StatusPill } from "@/components/status-pill";
 import { Text } from "@/components/text";
 import { assetsSchema, type PaymentNetwork, type ReceiverRequest, requestsSchema } from "@/lib/api";
 import { requestLink, transactionUrl } from "@/lib/config";
-import { formatAmount, formatWhen, sumAmounts } from "@/lib/format";
+import { formatWhen } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { networkList } from "@/lib/networks";
 import { useSession } from "@/lib/session";

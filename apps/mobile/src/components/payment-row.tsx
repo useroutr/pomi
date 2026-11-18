@@ -1,8 +1,8 @@
 import { StyleSheet, View } from "react-native";
 import { type ReceiverRequest } from "@/lib/api";
-import { formatAmount, formatWhen } from "@/lib/format";
+import { formatWhen } from "@/lib/format";
 import { usePalette } from "@/theme/theme";
-import { networkName } from "@pomi/shared";
+import { formatAmount, networkName } from "@pomi/shared";
 import { AssetMark } from "./asset-logo";
 import { PressableScale } from "./pressable-scale";
 import { requestTitle } from "./request-row";

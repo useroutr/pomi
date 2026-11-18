@@ -1,4 +1,5 @@
 export { assertAmountFits, InvalidAmountError, parseRequestAmount } from "./amount";
+export { formatAmount, sumAmounts } from "./amount-display";
 export {
   findEvmAddress,
   InvalidEvmAddressError,
@@ -6,7 +7,7 @@ export {
   shortenEvmAddress,
 } from "./evm-address";
 export { InvalidHandleError, parseHandle } from "./handle";
-export { POMI_MARK } from "./mark";
+export { POMI_ICON_COIN, POMI_MARK } from "./mark";
 export { networkList, networkName, shortenAddress } from "./networks";
 export { product } from "./product";
 export { drawQrCode, type QrPaths, roundedSquare } from "./qr-paths";

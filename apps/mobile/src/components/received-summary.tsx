@@ -1,6 +1,6 @@
 import { StyleSheet, View } from "react-native";
+import { sumAmounts } from "@pomi/shared";
 import { type ReceiverRequest } from "@/lib/api";
-import { sumAmounts } from "@/lib/format";
 import { radius } from "@/theme/theme";
 import { AssetLogo } from "./asset-logo";
 import { receivedPayments } from "./payment-row";
