@@ -1,0 +1,27 @@
+{
+  "fill": {
+    "automatic-gradient": "extended-srgb:0.41569,0.23922,0.96078,1.00000"
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "image-name": "mark.png",
+          "name": "mark"
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    }
+  ],
+  "supported-platforms": {
+    "circles": ["watchOS"],
+    "squares": "shared"
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InvalidAmountError, parseRequestAmount } from "./amount";
+import { assertAmountFits, InvalidAmountError, parseRequestAmount } from "./amount";
 
 describe("parseRequestAmount", () => {
   it.each([
@@ -32,5 +32,27 @@ describe("parseRequestAmount", () => {
 
   it("refuses an amount above the largest int64 of stroops", () => {
     expect(() => parseRequestAmount("922337203685.4775808")).toThrow("larger than Stellar");
+  });
+});
+
+describe("assertAmountFits", () => {
+  it.each([
+    ["25", 6],
+    ["12.5", 6],
+    ["0.000001", 6],
+    ["1.1234567", 7],
+  ])("accepts %j with %j decimal places", (amount, decimals) => {
+    expect(() => {
+      assertAmountFits(amount, decimals);
+    }).not.toThrow();
+  });
+
+  it("refuses more decimal places than the asset has", () => {
+    expect(() => {
+      assertAmountFits("1.1234567", 6);
+    }).toThrow(InvalidAmountError);
+    expect(() => {
+      assertAmountFits("1.5", 0);
+    }).toThrow("whole amount");
   });
 });

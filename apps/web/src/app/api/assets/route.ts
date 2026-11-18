@@ -8,5 +8,6 @@ export function GET(request: NextRequest) {
     auth: authService(),
     requests: requestService(),
     appUrl: serverConfig().appUrl,
+    network: serverConfig().stellar.network,
   });
 }

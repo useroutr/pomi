@@ -1,6 +1,6 @@
 "use client";
 
-import { shortenStellarAccount } from "@pomi/shared";
+import { shortenAddress } from "@pomi/shared";
 import { useRouter } from "next/navigation";
 import { type SubmitEvent, useState } from "react";
 import { callApi } from "@/lib/api-client";
@@ -10,6 +10,7 @@ export interface DashboardPayBox {
   open: boolean;
   assetId: string;
   assetSymbol: string;
+  assetNetwork: string;
   amount: string | null;
   minimumAmount: string | null;
   payoutAddress: string;
@@ -67,7 +68,7 @@ export function PayBoxForm({
           {payBox.amount === null
             ? `any amount of ${payBox.assetSymbol}${payBox.minimumAmount === null ? "" : `, at least ${payBox.minimumAmount}`}`
             : `${payBox.amount} ${payBox.assetSymbol}`}
-          , paid to {shortenStellarAccount(payBox.payoutAddress)}.
+          , paid to {shortenAddress(payBox.assetNetwork, payBox.payoutAddress)}.
           {payBox.payoutAddress !== currentPayoutAddress &&
             " Save it again to use your new address."}
         </p>

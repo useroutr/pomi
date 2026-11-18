@@ -1,7 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import { createContext, type ReactNode, use, useEffect, useMemo, useState } from "react";
 import { ApiClient, sessionSchema } from "./api";
-import { forgetPushDevice, registerForPush } from "./push";
+import { forgetPushDevice, registerIfAllowed } from "./push";
 
 const TOKEN_KEY = "pomi.session";
 
@@ -11,9 +11,13 @@ type SessionState =
 interface Session {
   state: SessionState;
   api: ApiClient;
-  verifyCode: (email: string, code: string) => Promise<string | null>;
+  verifyCode: (email: string, code: string) => Promise<VerifyResult>;
   signOut: () => Promise<void>;
 }
+
+// Signed in, with whether a handle is claimed yet (the next step depends on
+// it), or the message to show.
+export type VerifyResult = { ok: true; handle: string | null } | { ok: false; message: string };
 
 const SessionContext = createContext<Session | null>(null);
 
@@ -33,7 +37,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return {
       state,
       api,
-      // Answers null when signed in, or the message to show.
       async verifyCode(email, code) {
         const result = await api.post(
           "/api/auth/verify",
@@ -41,12 +44,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           sessionSchema,
         );
         if (!result.ok) {
-          return result.message;
+          return { ok: false, message: result.message };
         }
         await SecureStore.setItemAsync(TOKEN_KEY, result.value.session.token);
         setState({ status: "signed-in", token: result.value.session.token });
-        void registerForPush(new ApiClient(result.value.session.token));
-        return null;
+        void registerIfAllowed(new ApiClient(result.value.session.token));
+        return { ok: true, handle: result.value.user.handle };
       },
       async signOut() {
         await forgetPushDevice(api);

@@ -1,12 +1,16 @@
 import { type NextRequest } from "next/server";
-import { authService, payoutAddressService } from "@/server/app-services";
+import { authService, payoutAddressService, requestService } from "@/server/app-services";
 import {
   handleGetPayoutAddress,
   handleSetPayoutAddress,
 } from "@/server/payout-addresses/payout-address-routes";
 
 function services() {
-  return { auth: authService(), payoutAddresses: payoutAddressService() };
+  return {
+    auth: authService(),
+    payoutAddresses: payoutAddressService(),
+    requests: requestService(),
+  };
 }
 
 export function GET(request: NextRequest) {

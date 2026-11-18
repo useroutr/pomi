@@ -60,46 +60,99 @@ function apiError(status: number, code: string) {
   );
 }
 
+const STELLAR_USDC = {
+  id: "asset_usdc_stellar",
+  object: "asset",
+  network: "stellar",
+  symbol: "USDC",
+  decimals: 7,
+  stellar_asset: "USDC:GISSUER",
+  code: "USDC",
+  issuer: "GISSUER",
+  contract: "CCONTRACT",
+};
+
+function evmAsset(id: string, network: string, symbol: string, destination?: boolean) {
+  return {
+    id,
+    object: "asset",
+    network,
+    symbol,
+    decimals: 6,
+    contract: `0x${Buffer.from(id).toString("hex").padStart(40, "0").slice(-40)}`,
+    ...(destination === undefined ? {} : { destination }),
+  };
+}
+
+function assetList(...data: object[]) {
+  return Response.json({ object: "list", data });
+}
+
 describe("createUseroutrGateway", () => {
-  it("lists only Stellar assets, and caches the list", async () => {
+  it("lists every asset, marks those a receiver can be paid in, and caches the list", async () => {
     const { gateway, calls } = gatewayAnswering([
-      Response.json({
-        object: "list",
-        data: [
-          {
-            id: "asset_usdc_stellar",
-            object: "asset",
-            network: "stellar",
-            symbol: "USDC",
-            decimals: 7,
-            stellar_asset: "USDC:GISSUER",
-            code: "USDC",
-            issuer: "GISSUER",
-            contract: "CCONTRACT",
-          },
-          {
-            id: "asset_usdc_base",
-            object: "asset",
-            network: "base",
-            symbol: "USDC",
-            decimals: 6,
-            contract: "0xabc",
-          },
-        ],
-      }),
+      assetList(
+        STELLAR_USDC,
+        evmAsset("usdc_base", "base", "USDC", true),
+        evmAsset("eth_base", "base", "ETH", false),
+        evmAsset("usdc_arbitrum", "arbitrum", "USDC"),
+      ),
     ]);
 
-    const assets = await gateway.stellarAssets();
-    await gateway.stellarAssets();
+    const assets = await gateway.assets();
+    await gateway.assets();
 
-    expect(assets).toEqual([
-      { id: "asset_usdc_stellar", symbol: "USDC", code: "USDC", issuer: "GISSUER" },
+    expect(
+      assets.map((asset) => [asset.id, asset.network, asset.payout, asset.addressKind]),
+    ).toEqual([
+      ["asset_usdc_stellar", "stellar", true, "stellar"],
+      ["usdc_base", "base", true, "evm"],
+      ["eth_base", "base", false, "evm"],
+      // An API that does not yet say where it pays out is read as "not here".
+      ["usdc_arbitrum", "arbitrum", false, "evm"],
+    ]);
+    expect(assets[0]).toMatchObject({ decimals: 7, stellar: { code: "USDC", issuer: "GISSUER" } });
+    expect(assets[1]).toMatchObject({ decimals: 6, stellar: null });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("groups every listed asset by the network a payer can pay from, from the same cached list", async () => {
+    const { gateway, calls } = gatewayAnswering([
+      assetList(
+        {
+          id: "asset_xlm",
+          object: "asset",
+          network: "stellar",
+          symbol: "XLM",
+          decimals: 7,
+          stellar_asset: "native",
+          code: "XLM",
+          issuer: null,
+          contract: "CNATIVE",
+        },
+        evmAsset("usdc_base", "base", "USDC"),
+        evmAsset("eth_base", "base", "ETH"),
+        evmAsset("usdc_arbitrum", "arbitrum", "USDC"),
+        evmAsset("usdc_base_again", "base", "USDC"),
+      ),
+    ]);
+
+    const networks = await gateway.paymentNetworks();
+    await gateway.assets();
+
+    expect(networks).toEqual([
+      { network: "stellar", symbols: ["XLM"] },
+      { network: "base", symbols: ["USDC", "ETH"] },
+      { network: "arbitrum", symbols: ["USDC"] },
     ]);
     expect(calls).toHaveLength(1);
   });
 
   it("creates an intent paying the receiver on Stellar, under the request's key", async () => {
-    const { gateway, calls } = gatewayAnswering([Response.json(createdIntent, { status: 201 })]);
+    const { gateway, calls } = gatewayAnswering([
+      assetList(STELLAR_USDC),
+      Response.json(createdIntent, { status: 201 }),
+    ]);
 
     const created = await gateway.createFundingIntent(newIntent);
 
@@ -108,7 +161,7 @@ describe("createUseroutrGateway", () => {
       token: "tok_abc",
       expiresAt: new Date("2026-11-10T12:30:00.000Z"),
     });
-    const [call] = calls;
+    const call = calls[1];
     expect(call?.url).toBe("https://api.sandbox.useroutr.com/v1/funding-intents");
     expect(new Headers(call?.init.headers).get("idempotency-key")).toBe("pomi:req_1:0");
     expect(JSON.parse(typeof call?.init.body === "string" ? call.init.body : "null")).toEqual({
@@ -123,38 +176,74 @@ describe("createUseroutrGateway", () => {
     });
   });
 
+  it("pays a receiver on the asset's own network", async () => {
+    const baseAddress = "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
+    const { gateway, calls } = gatewayAnswering([
+      assetList(STELLAR_USDC, evmAsset("usdc_base", "base", "USDC", true)),
+      Response.json(createdIntent, { status: 201 }),
+    ]);
+
+    await gateway.createFundingIntent({
+      ...newIntent,
+      assetId: "usdc_base",
+      payoutAddress: baseAddress,
+    });
+
+    const body: unknown = JSON.parse(
+      typeof calls[1]?.init.body === "string" ? calls[1].init.body : "null",
+    );
+    expect(body).toMatchObject({
+      destination: { network: "base", asset: "usdc_base", address: baseAddress },
+    });
+  });
+
+  it("refuses an asset Useroutr no longer lists, without creating anything", async () => {
+    const { gateway, calls } = gatewayAnswering([assetList(STELLAR_USDC)]);
+
+    await expect(
+      gateway.createFundingIntent({ ...newIntent, assetId: "asset_gone" }),
+    ).rejects.toThrow(UseroutrResponseError);
+    expect(calls).toHaveLength(1);
+  });
+
   it("waits for another visitor's identical request, then takes its replayed answer", async () => {
     const { gateway, calls, sleeps } = gatewayAnswering([
+      assetList(STELLAR_USDC),
       apiError(409, "IDEMPOTENCY_REQUEST_IN_PROGRESS"),
       apiError(409, "IDEMPOTENCY_REQUEST_IN_PROGRESS"),
       Response.json(createdIntent, { status: 201 }),
     ]);
 
     await expect(gateway.createFundingIntent(newIntent)).resolves.toMatchObject({ id: "fi_1" });
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(4);
     expect(sleeps).toEqual([1000, 2000]);
   });
 
   it("gives up once it has waited 90 seconds for the other request", async () => {
-    const { gateway, calls, sleeps } = gatewayAnswering(
-      Array.from({ length: 12 }, () => apiError(409, "IDEMPOTENCY_REQUEST_IN_PROGRESS")),
-    );
+    const { gateway, calls, sleeps } = gatewayAnswering([
+      assetList(STELLAR_USDC),
+      ...Array.from({ length: 12 }, () => apiError(409, "IDEMPOTENCY_REQUEST_IN_PROGRESS")),
+    ]);
 
     await expect(gateway.createFundingIntent(newIntent)).rejects.toMatchObject({
       code: "IDEMPOTENCY_REQUEST_IN_PROGRESS",
     });
     expect(sleeps).toEqual([1000, 2000, 4000, 8000, 15000, 15000, 15000, 15000, 15000]);
-    expect(calls).toHaveLength(10);
+    expect(calls).toHaveLength(11);
   });
 
   it("reports a destination Useroutr refuses", async () => {
-    const { gateway } = gatewayAnswering([apiError(422, "INVALID_DESTINATION")]);
+    const { gateway } = gatewayAnswering([
+      assetList(STELLAR_USDC),
+      apiError(422, "INVALID_DESTINATION"),
+    ]);
 
     await expect(gateway.createFundingIntent(newIntent)).rejects.toThrow(DestinationRefusedError);
   });
 
   it("fails on an intent without a funding page", async () => {
     const { gateway } = gatewayAnswering([
+      assetList(STELLAR_USDC),
       Response.json({ ...createdIntent, hosted_funding_url: null }, { status: 201 }),
     ]);
 

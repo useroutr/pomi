@@ -15,7 +15,25 @@ import { type ProfileService } from "./profile-service";
 
 interface Services {
   auth: Pick<AuthService, "resolveSession">;
-  profiles: Pick<ProfileService, "profile" | "claimHandle" | "setDisplayName">;
+  profiles: Pick<
+    ProfileService,
+    "profile" | "claimHandle" | "setDisplayName" | "handleAvailability"
+  >;
+}
+
+// Signed in only: handles are public once claimed, but a free lookup for
+// anyone would make listing every receiver cheap.
+export async function handleGetHandleAvailability(
+  request: NextRequest,
+  handle: string,
+  services: Services,
+) {
+  try {
+    await signedInUser(request, services.auth);
+    return NextResponse.json(await services.profiles.handleAvailability(handle.slice(0, 64)));
+  } catch (error) {
+    return requestErrorResponse(error) ?? rethrow(error);
+  }
 }
 
 export async function handleGetMe(request: NextRequest, services: Services) {

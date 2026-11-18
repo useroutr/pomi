@@ -1,6 +1,7 @@
 import { InvalidAmountError } from "@pomi/shared";
 import { ConnectionError } from "@useroutr/sdk";
 import { describe, expect, it } from "vitest";
+import { CATALOG_ASSETS } from "@/test/fake-useroutr";
 import { apiRequest, errorCode, fakeAuth } from "@/test/route-requests";
 import {
   PayoutAddressRequiredError,
@@ -27,6 +28,7 @@ const payBox = {
   open: true,
   assetId: "asset_usdc_stellar",
   assetSymbol: "USDC",
+  assetNetwork: "stellar",
   amount: null,
   minimumAmount: "5",
   payoutAddress: "GABC",
@@ -47,7 +49,16 @@ function servicesWith(requests: {
       closeRequest: requests.closeRequest ?? (() => Promise.resolve()),
       updateRequest: requests.updateRequest ?? (() => Promise.resolve()),
       requestableAssets: () =>
-        Promise.resolve([{ id: "asset_xlm_stellar", symbol: "XLM", code: "XLM", issuer: null }]),
+        Promise.resolve(
+          CATALOG_ASSETS.filter((asset) =>
+            ["asset_xlm_stellar", "asset_usdc_base"].includes(asset.id),
+          ),
+        ),
+      paymentNetworks: () =>
+        Promise.resolve([
+          { network: "stellar", symbols: ["XLM"] },
+          { network: "base", symbols: ["USDC", "ETH"] },
+        ]),
       payBox: () => Promise.resolve(payBox),
       setPayBox: requests.setPayBox ?? (() => Promise.resolve(payBox)),
       closePayBox: () => Promise.resolve(),
@@ -73,7 +84,7 @@ describe("request routes", () => {
   it.each([
     [new InvalidAmountError("bad"), 400, "invalid_amount"],
     [new UnsupportedAssetError(), 400, "unsupported_asset"],
-    [new PayoutAddressRequiredError(), 409, "payout_address_required"],
+    [new PayoutAddressRequiredError("stellar"), 409, "payout_address_required"],
     [new PayoutAssetNotTrustedError("USDC", "GA5Z...KZVN"), 422, "asset_not_trusted"],
     [new ConnectionError("down", { code: "CONNECTION_ERROR" }), 503, "useroutr_unavailable"],
   ])("answers %s with %i", async (error, status, code) => {
@@ -144,10 +155,23 @@ describe("listing, assets and the pay box", () => {
     expect(response.status).toBe(404);
   });
 
-  it("lists the assets a request can ask for, by id and symbol only", async () => {
-    const response = await handleListAssets(apiRequest("/api/assets"), servicesWith({}));
+  it("lists the assets a request can ask for, and the networks payers can pay from", async () => {
+    const response = await handleListAssets(apiRequest("/api/assets"), {
+      ...servicesWith({}),
+      network: "testnet",
+    });
 
-    expect(await response.json()).toEqual({ assets: [{ id: "asset_xlm_stellar", symbol: "XLM" }] });
+    expect(await response.json()).toEqual({
+      assets: [
+        { id: "asset_xlm_stellar", symbol: "XLM", network: "stellar", decimals: 7 },
+        { id: "asset_usdc_base", symbol: "USDC", network: "base", decimals: 6 },
+      ],
+      network: "testnet",
+      payWith: [
+        { network: "stellar", symbols: ["XLM"] },
+        { network: "base", symbols: ["USDC", "ETH"] },
+      ],
+    });
   });
 
   it("returns and saves the pay box", async () => {
@@ -166,7 +190,7 @@ describe("listing, assets and the pay box", () => {
 
   it.each([
     [new InvalidMinimumError("A fixed amount has no minimum."), 400, "invalid_minimum"],
-    [new PayoutAddressRequiredError(), 409, "payout_address_required"],
+    [new PayoutAddressRequiredError("stellar"), 409, "payout_address_required"],
   ])("refuses a pay box with %s", async (error, status, code) => {
     const response = await handleSetPayBox(
       apiRequest("/api/me/pay-box", { method: "PUT", body: { assetId: "asset_usdc_stellar" } }),

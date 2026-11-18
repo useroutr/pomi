@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  findStellarAccount,
   InvalidStellarAccountError,
   parseStellarAccount,
   shortenStellarAccount,
@@ -32,6 +33,29 @@ describe("parseStellarAccount", () => {
     ["a secret key", "SBEKHUB5XLRG2O45FMBKMJT2ZTMRDBVBDKA6KHHHFUEWNEZ7ZZE4QW3O"],
   ])("refuses %s", (_case, input) => {
     expect(() => parseStellarAccount(input)).toThrow(InvalidStellarAccountError);
+  });
+});
+
+describe("findStellarAccount", () => {
+  it.each([
+    [ACCOUNT, ACCOUNT],
+    [`  ${ACCOUNT.toLowerCase()}\n`, ACCOUNT],
+    [`My Stellar address is ${ACCOUNT}.`, ACCOUNT],
+    [`web+stellar:pay?destination=${ACCOUNT}&amount=5`, ACCOUNT],
+    [`${ACCOUNT} ${ACCOUNT}`, ACCOUNT],
+  ])("finds the address in %j", (text, expected) => {
+    expect(findStellarAccount(text)).toBe(expected);
+  });
+
+  it.each([
+    "",
+    "305040",
+    ACCOUNT.slice(0, 55),
+    `${ACCOUNT.slice(0, 10)}${ACCOUNT[10] === "A" ? "B" : "A"}${ACCOUNT.slice(11)}`,
+    `X${ACCOUNT}`,
+    `${ACCOUNT} or ${OTHER_ACCOUNT}`,
+  ])("finds no address in %j", (text) => {
+    expect(findStellarAccount(text)).toBeNull();
   });
 });
 
