@@ -13,6 +13,8 @@ import {
 } from "../payout-addresses/payout-address-errors";
 import { payoutAddressErrorResponse } from "../payout-addresses/payout-address-routes";
 import {
+  InvalidEndDateError,
+  InvalidMinimumError,
   InvalidNoteError,
   RequestAlreadyPaidError,
   RequestNotFoundError,
@@ -22,7 +24,17 @@ import { type RequestService } from "./request-service";
 
 interface Services {
   auth: Pick<AuthService, "resolveSession">;
-  requests: Pick<RequestService, "createRequest" | "listRequests" | "closeRequest">;
+  requests: Pick<
+    RequestService,
+    | "createRequest"
+    | "listRequests"
+    | "closeRequest"
+    | "updateRequest"
+    | "requestableAssets"
+    | "payBox"
+    | "setPayBox"
+    | "closePayBox"
+  >;
   appUrl: string;
 }
 
@@ -30,6 +42,17 @@ const createRequestBodySchema = z.object({
   amount: z.string().max(40),
   assetId: z.string().max(100),
   note: z.string().max(1000).optional(),
+  reusable: z.boolean().optional(),
+  listed: z.boolean().optional(),
+  endsAt: z.string().max(40).optional(),
+});
+
+const updateRequestBodySchema = z.object({ listed: z.boolean() });
+
+const payBoxBodySchema = z.object({
+  assetId: z.string().max(100),
+  amount: z.string().max(40).optional(),
+  minimumAmount: z.string().max(40).optional(),
 });
 
 export async function handleCreateRequest(request: NextRequest, services: Services) {
@@ -60,6 +83,70 @@ export async function handleListRequests(request: NextRequest, services: Service
   }
 }
 
+export async function handleUpdateRequest(
+  request: NextRequest,
+  requestId: string,
+  services: Services,
+) {
+  try {
+    const user = await signedInUser(request, services.auth);
+    const body = await readJsonBody(request, updateRequestBodySchema);
+    await services.requests.updateRequest(user.id, requestId, body);
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    if (error instanceof RequestNotFoundError) {
+      return errorResponse(404, "not_found", error.message);
+    }
+    return requestErrorResponse(error) ?? rethrow(error);
+  }
+}
+
+export async function handleListAssets(request: NextRequest, services: Services) {
+  try {
+    await signedInUser(request, services.auth);
+    const assets = await services.requests.requestableAssets();
+    return NextResponse.json({
+      assets: assets.map((asset) => ({ id: asset.id, symbol: asset.symbol })),
+    });
+  } catch (error) {
+    return useroutrErrorResponse(error) ?? requestErrorResponse(error) ?? rethrow(error);
+  }
+}
+
+export async function handleGetPayBox(request: NextRequest, services: Services) {
+  try {
+    const user = await signedInUser(request, services.auth);
+    return NextResponse.json({ payBox: await services.requests.payBox(user.id) });
+  } catch (error) {
+    return useroutrErrorResponse(error) ?? requestErrorResponse(error) ?? rethrow(error);
+  }
+}
+
+export async function handleSetPayBox(request: NextRequest, services: Services) {
+  try {
+    const user = await signedInUser(request, services.auth);
+    const body = await readJsonBody(request, payBoxBodySchema);
+    return NextResponse.json({ payBox: await services.requests.setPayBox(user.id, body) });
+  } catch (error) {
+    return (
+      createRequestErrorResponse(error) ??
+      payoutAddressErrorResponse(error) ??
+      requestErrorResponse(error) ??
+      rethrow(error)
+    );
+  }
+}
+
+export async function handleClosePayBox(request: NextRequest, services: Services) {
+  try {
+    const user = await signedInUser(request, services.auth);
+    await services.requests.closePayBox(user.id);
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    return requestErrorResponse(error) ?? rethrow(error);
+  }
+}
+
 export async function handleCloseRequest(
   request: NextRequest,
   requestId: string,
@@ -86,6 +173,12 @@ function createRequestErrorResponse(error: unknown) {
   }
   if (error instanceof InvalidNoteError) {
     return errorResponse(400, "invalid_note", error.message);
+  }
+  if (error instanceof InvalidEndDateError) {
+    return errorResponse(400, "invalid_end_date", error.message);
+  }
+  if (error instanceof InvalidMinimumError) {
+    return errorResponse(400, "invalid_minimum", error.message);
   }
   if (error instanceof UnsupportedAssetError) {
     return errorResponse(400, "unsupported_asset", error.message);

@@ -22,6 +22,9 @@ describe("parseServerConfig", () => {
     expect(config.databaseUrl).toBe(valid.DATABASE_URL);
     expect(config.walletConnectProjectId).toBeNull();
     expect(config.cronSecret).toBeNull();
+    expect(config.operatorEmail).toBeNull();
+    expect(config.clientIpHeader).toBeNull();
+    expect(config.expoAccessToken).toBeNull();
   });
 
   it("points a ur_live_ key at production", () => {
@@ -45,6 +48,12 @@ describe("parseServerConfig", () => {
     ["a missing app URL", { APP_URL: undefined }, "APP_URL"],
     ["an app URL that is not http", { APP_URL: "ftp://pomi.app" }, "APP_URL"],
     ["a short cron secret", { CRON_SECRET: "short" }, "CRON_SECRET"],
+    ["an operator email that is not one", { OPERATOR_EMAIL: "operator" }, "OPERATOR_EMAIL"],
+    [
+      "a client IP header that is not a name",
+      { CLIENT_IP_HEADER: "x real ip" },
+      "CLIENT_IP_HEADER",
+    ],
     ["a missing auth secret", { AUTH_SECRET: undefined }, "AUTH_SECRET"],
     ["a short auth secret", { AUTH_SECRET: "a".repeat(31) }, "AUTH_SECRET"],
     ["an unknown email delivery", { EMAIL_DELIVERY: "smtp" }, "EMAIL_DELIVERY"],
@@ -121,6 +130,7 @@ describe("parseServerConfig", () => {
       EMAIL_DELIVERY: "resend",
       RESEND_API_KEY: "re_example",
       EMAIL_FROM: "Pomi <hello@pomi.app>",
+      CLIENT_IP_HEADER: "x-real-ip",
     };
 
     expect(() => parseServerConfig(production)).toThrow(/APP_URL: must be https/);
@@ -146,5 +156,32 @@ describe("parseServerConfig", () => {
     expect(config.useroutr.apiUrl).toBe("http://localhost:4000");
     expect(config.useroutr.publicApiUrl).toBe("http://localhost:4000/v1/public");
     expect(config.stellar.network).toBe("testnet");
+  });
+
+  it("requires a trusted client address header in a production build", () => {
+    const production = {
+      ...valid,
+      NODE_ENV: "production",
+      APP_URL: "https://pomi.app",
+      EMAIL_DELIVERY: "resend",
+      RESEND_API_KEY: "re_example",
+      EMAIL_FROM: "Pomi <hello@pomi.app>",
+    };
+
+    expect(() => parseServerConfig(production)).toThrow(/CLIENT_IP_HEADER: is required/);
+    expect(parseServerConfig({ ...production, CLIENT_IP_HEADER: "X-Real-IP" }).clientIpHeader).toBe(
+      "x-real-ip",
+    );
+  });
+
+  it("keeps the operator's email and the Expo access token", () => {
+    const config = parseServerConfig({
+      ...valid,
+      OPERATOR_EMAIL: "ops@pomi.app",
+      EXPO_ACCESS_TOKEN: "expo_token",
+    });
+
+    expect(config.operatorEmail).toBe("ops@pomi.app");
+    expect(config.expoAccessToken).toBe("expo_token");
   });
 });

@@ -63,7 +63,7 @@ function createPayment(id: string, fundingIntentId: string) {
 }
 
 beforeEach(async () => {
-  await database.$executeRaw`TRUNCATE "users", "payout_addresses", "requests", "request_intents", "request_payments", "outbox_emails", "refunds", "webhook_events", "sign_in_codes", "sessions" CASCADE`;
+  await database.$executeRaw`TRUNCATE "users", "payout_addresses", "requests", "request_intents", "request_payments", "outbox_emails", "outbox_pushes", "devices", "refunds", "webhook_events", "sign_in_codes", "sessions" CASCADE`;
   await createUser("usr_1");
   // Inactive, so the tests of the one active address start from none.
   await database.payoutAddress.create({
@@ -297,5 +297,37 @@ describe("sign-in", () => {
         },
       }),
     ).rejects.toThrow("sessions_user_id_fkey");
+  });
+});
+
+describe("profiles, devices and notices", () => {
+  it.each(["", "x".repeat(51)])("refuses the display name %j", async (displayName) => {
+    await expect(createUser("usr_2", { displayName })).rejects.toThrow("users_display_name_length");
+  });
+
+  it("gives a push token to one device", async () => {
+    const device = { userId: "usr_1", pushToken: "ExponentPushToken[a]", platform: "IOS" } as const;
+    await database.device.create({ data: { id: "dev_1", ...device, createdAt: new Date() } });
+
+    await expect(
+      database.device.create({ data: { id: "dev_2", ...device, createdAt: new Date() } }),
+    ).rejects.toThrow("push_token");
+  });
+
+  it("refuses a payment email without its payment, or with a refund", async () => {
+    await database.refund.create({
+      data: { id: "ref_1", fundingIntentId: "fi_1", status: "PENDING" },
+    });
+
+    await expect(
+      database.outboxEmail.create({
+        data: { id: "email_1", kind: "PAYMENT_RECEIVED", createdAt: new Date() },
+      }),
+    ).rejects.toThrow("outbox_emails_subject_matches_kind");
+    await expect(
+      database.outboxEmail.create({
+        data: { id: "email_2", kind: "REFUND_DESTINATION_REQUIRED", createdAt: new Date() },
+      }),
+    ).rejects.toThrow("outbox_emails_subject_matches_kind");
   });
 });

@@ -35,7 +35,7 @@ enum IntentState {
 }
 
 // users_handle_format: the format parseHandle enforces in packages/shared.
-// users_email_lowercase.
+// users_email_lowercase, users_display_name_length.
 model User {
   id          String   @id
   // Stored lowercase.
@@ -48,6 +48,7 @@ model User {
   payoutAddresses PayoutAddress[]
   requests        Request[]
   sessions        Session[]
+  devices         Device[]
 
   @@map("users")
 }
@@ -152,6 +153,10 @@ model RequestIntent {
   // The visit a per-visitor intent belongs to. A single-use request's
   // intent is shared by every visitor, so it has none.
   visitId         String?     @map("visit_id")
+  // Who started it, for the checkout limits: the visitor cookie's id, and an
+  // HMAC of the client's IP address. The address itself is never stored.
+  visitorId       String?     @map("visitor_id")
+  clientKey       String?     @map("client_key")
   // What the intent asks for; for an open amount, what the payer chose.
   amount          Decimal     @db.Decimal(19, 7)
   // Set for a single-use request's intent, which every visitor shares.
@@ -165,6 +170,8 @@ model RequestIntent {
   request Request @relation(fields: [requestId], references: [id])
 
   @@unique([requestId, visitId])
+  @@index([visitorId, createdAt])
+  @@index([clientKey, createdAt])
   @@map("request_intents")
 }
 
@@ -184,6 +191,7 @@ model RequestPayment {
 
   request Request       @relation(fields: [requestId], references: [id])
   emails  OutboxEmail[]
+  pushes  OutboxPush[]
 
   @@index([requestId])
   @@map("request_payments")
@@ -191,26 +199,68 @@ model RequestPayment {
 
 enum EmailKind {
   PAYMENT_RECEIVED
+  // To the operator, who names the destination with the SDK's refunds.update.
+  REFUND_DESTINATION_REQUIRED
 }
 
 // Written in the same transaction as the change it reports, and sent after
 // the commit, so a failed send never fails or repeats that change. One email
-// of each kind per payment, however often the webhook arrives.
+// of each kind per payment or refund, however often the webhook arrives.
 // outbox_emails_unsent: a partial index for the sender's query.
+// outbox_emails_subject_matches_kind: a payment email names a payment, a
+//   refund email a refund, and never both.
 model OutboxEmail {
   id               String    @id
   kind             EmailKind
-  requestPaymentId String    @map("request_payment_id")
+  requestPaymentId String?   @map("request_payment_id")
+  refundId         String?   @map("refund_id")
   attempts         Int       @default(0)
   // A sender holds the email until then, so two senders never both send it.
   claimedUntil     DateTime? @map("claimed_until")
   sentAt           DateTime? @map("sent_at")
   createdAt        DateTime  @map("created_at")
 
-  requestPayment RequestPayment @relation(fields: [requestPaymentId], references: [id])
+  requestPayment RequestPayment? @relation(fields: [requestPaymentId], references: [id], onDelete: Restrict)
+  refund         Refund?         @relation(fields: [refundId], references: [id], onDelete: Restrict)
 
   @@unique([kind, requestPaymentId])
+  @@unique([kind, refundId])
   @@map("outbox_emails")
+}
+
+// The push notifications for a payment, to every device the receiver has
+// registered when it is sent. Sent and retried like outbox_emails.
+// outbox_pushes_unsent: a partial index for the sender's query.
+model OutboxPush {
+  id               String    @id
+  requestPaymentId String    @unique @map("request_payment_id")
+  attempts         Int       @default(0)
+  claimedUntil     DateTime? @map("claimed_until")
+  sentAt           DateTime? @map("sent_at")
+  createdAt        DateTime  @map("created_at")
+
+  requestPayment RequestPayment @relation(fields: [requestPaymentId], references: [id])
+
+  @@map("outbox_pushes")
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+}
+
+model Device {
+  id        String         @id
+  userId    String         @map("user_id")
+  // An Expo push token. One device belongs to whoever signed in on it last.
+  pushToken String         @unique @map("push_token")
+  platform  DevicePlatform
+  createdAt DateTime       @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("devices")
 }
 
 model Refund {
@@ -222,6 +272,8 @@ model Refund {
   destinationRequiredAt DateTime? @map("destination_required_at")
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  emails OutboxEmail[]
 
   @@index([fundingIntentId])
   @@map("refunds")

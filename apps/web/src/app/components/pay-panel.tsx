@@ -7,29 +7,37 @@ import {
   createStellarWalletsKitConnector,
   createWalletConnectEvmConnector,
 } from "@useroutr/checkout-wallets";
-import { useMemo, useState } from "react";
+import { type SubmitEvent, useMemo, useState } from "react";
 import { z } from "zod";
 import { callApi } from "@/lib/api-client";
 
 const checkoutSchema = z.object({ token: z.string().min(1) });
 
+export interface PayableRequest {
+  id: string;
+  // Null when the payer chooses the amount.
+  amount: string | null;
+  minimumAmount: string | null;
+  assetSymbol: string;
+}
+
 // The checkout is started only when the payer asks to pay, never when the
 // page loads, so a link preview or a crawler cannot create funding intents.
 export function PayPanel({
-  requestId,
-  label,
+  request,
   publicApiUrl,
   walletConnectProjectId,
 }: {
-  requestId: string;
-  label: string;
+  request: PayableRequest;
   publicApiUrl: string;
   walletConnectProjectId: string | null;
 }) {
   const [token, setToken] = useState<string | null>(null);
+  const [chosenAmount, setChosenAmount] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paid, setPaid] = useState(false);
+  const payerChooses = request.amount === null;
 
   // The same wallets as Useroutr's hosted checkout. The wallet libraries load
   // only when a payer opens the list.
@@ -47,11 +55,13 @@ export function PayPanel({
     [walletConnectProjectId],
   );
 
-  async function start() {
+  async function start(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
     setPending(true);
     setError(null);
-    const result = await callApi(`/api/r/${encodeURIComponent(requestId)}/checkout`, {
+    const result = await callApi(`/api/r/${encodeURIComponent(request.id)}/checkout`, {
       method: "POST",
+      body: payerChooses ? { amount: chosenAmount } : {},
     });
     setPending(false);
     if (!result.ok) {
@@ -66,6 +76,12 @@ export function PayPanel({
     setToken(checkout.data.token);
   }
 
+  const shownAmount = payerChooses ? chosenAmount.trim() : request.amount;
+  const payLabel =
+    shownAmount === null || shownAmount === ""
+      ? `Pay in ${request.assetSymbol}`
+      : `Pay ${shownAmount} ${request.assetSymbol}`;
+
   if (paid) {
     return (
       <section className="card">
@@ -76,14 +92,29 @@ export function PayPanel({
 
   if (token === null) {
     return (
-      <section className="card stack">
-        <button
-          type="button"
-          className="pay-button"
-          disabled={pending}
-          onClick={() => void start()}
-        >
-          {pending ? "Preparing your payment..." : label}
+      <form className="card stack" onSubmit={(event) => void start(event)}>
+        {payerChooses && (
+          <div className="field">
+            <label htmlFor={`amount-${request.id}`}>
+              Amount in {request.assetSymbol}
+              {request.minimumAmount !== null && ` (at least ${request.minimumAmount})`}
+            </label>
+            <input
+              id={`amount-${request.id}`}
+              className="text-input"
+              inputMode="decimal"
+              autoComplete="off"
+              placeholder={request.minimumAmount ?? "10"}
+              value={chosenAmount}
+              onChange={(event) => {
+                setChosenAmount(event.target.value);
+              }}
+              required
+            />
+          </div>
+        )}
+        <button type="submit" className="pay-button" disabled={pending}>
+          {pending ? "Preparing your payment..." : payLabel}
         </button>
         <p className="muted small">
           {pending
@@ -91,7 +122,7 @@ export function PayPanel({
             : "Pay with any supported token, from a wallet or by hand."}
         </p>
         {error !== null && <p className="error">{error}</p>}
-      </section>
+      </form>
     );
   }
 

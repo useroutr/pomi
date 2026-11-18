@@ -141,6 +141,23 @@ describe("handleVerifySignInCode", () => {
     expect(cookie).toContain(grant.expiresAt.toUTCString());
   });
 
+  it("gives the mobile app its token in the body, and sets no cookie", async () => {
+    const response = await handleVerifySignInCode(
+      jsonRequest("/api/auth/verify", {
+        email: "receiver@example.com",
+        code: "123456",
+        client: "mobile",
+      }),
+      { verifySignInCode: () => Promise.resolve(grant) },
+    );
+
+    expect(await response.json()).toEqual({
+      user: { handle: null },
+      session: { token: grant.token, expiresAt: grant.expiresAt.toISOString() },
+    });
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
   it("answers 400 for a wrong code, without a cookie", async () => {
     const response = await handleVerifySignInCode(
       jsonRequest("/api/auth/verify", { email: "receiver@example.com", code: "000000" }),
@@ -181,6 +198,23 @@ describe("handleSignOut", () => {
     expect(response.status).toBe(204);
     expect(signedOut).toEqual(["session_token_value"]);
     expect(response.headers.get("set-cookie")).toMatch(/pomi_session=;.*Expires=Thu, 01 Jan 1970/);
+  });
+
+  it("revokes the mobile app's bearer token", async () => {
+    const signedOut: string[] = [];
+    const request = new NextRequest("http://localhost:3000/api/auth/sign-out", {
+      method: "POST",
+      headers: { authorization: "Bearer mobile_token" },
+    });
+
+    await handleSignOut(request, {
+      signOut: (token) => {
+        signedOut.push(token);
+        return Promise.resolve();
+      },
+    });
+
+    expect(signedOut).toEqual(["mobile_token"]);
   });
 
   it("clears the cookie even without a session", async () => {

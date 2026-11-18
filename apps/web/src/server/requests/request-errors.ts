@@ -19,6 +19,20 @@ export class InvalidNoteError extends Error {
   }
 }
 
+export class InvalidEndDateError extends Error {
+  constructor() {
+    super("Choose an end date in the future.");
+    this.name = "InvalidEndDateError";
+  }
+}
+
+export class InvalidMinimumError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidMinimumError";
+  }
+}
+
 export class RequestAlreadyPaidError extends Error {
   constructor() {
     super("This request has been paid.");
@@ -30,5 +44,12 @@ export class RequestClosedError extends Error {
   constructor() {
     super("The receiver closed this request.");
     this.name = "RequestClosedError";
+  }
+}
+
+export class RequestEndedError extends Error {
+  constructor() {
+    super("This request has ended.");
+    this.name = "RequestEndedError";
   }
 }

@@ -41,7 +41,11 @@ The web app runs on http://localhost:3000. Sign in at `/sign-in`: locally, the c
 the terminal running the dev server instead of being emailed. A `ur_test_` Useroutr key works
 against the Useroutr sandbox, on the Stellar testnet.
 
+For the mobile app, point it at the web app, then start Expo and press `i` for the iOS
+simulator or `a` for an Android emulator:
+
 ```bash
+cp apps/mobile/.env.example apps/mobile/.env
 pnpm --filter @pomi/mobile start
 ```
 

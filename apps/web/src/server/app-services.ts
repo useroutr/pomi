@@ -3,12 +3,15 @@ import { createAuthService, type AuthService } from "./auth/auth-service";
 import { createCheckoutService, type CheckoutService } from "./checkout/checkout-service";
 import { serverConfig } from "./config";
 import { createDatabase, type Database } from "./database";
+import { createDeviceService, type DeviceService } from "./devices/device-service";
 import { createEmailDelivery } from "./email/create-email-delivery";
 import { createOutboxSender, type OutboxSender } from "./notifications/outbox-sender";
 import {
   createPayoutAddressService,
   type PayoutAddressService,
 } from "./payout-addresses/payout-address-service";
+import { createProfileService, type ProfileService } from "./profiles/profile-service";
+import { createExpoPushDelivery } from "./push/expo-push-delivery";
 import { createRequestService, type RequestService } from "./requests/request-service";
 import { createHorizonAccountReader } from "./stellar/horizon-account-reader";
 import { createUseroutrGateway } from "./useroutr/useroutr-gateway";
@@ -16,6 +19,8 @@ import { createWebhookService, type WebhookService } from "./webhooks/webhook-se
 
 interface AppServices {
   auth: AuthService;
+  profiles: ProfileService;
+  devices: DeviceService;
   payoutAddresses: PayoutAddressService;
   requests: RequestService;
   checkout: CheckoutService;
@@ -50,16 +55,24 @@ function appServices(): AppServices {
     });
     services = {
       auth: createAuthService({ database, emailDelivery, authSecret: config.authSecret }),
+      profiles: createProfileService({ database }),
+      devices: createDeviceService({ database }),
       payoutAddresses,
       requests: createRequestService({ database, useroutr, payoutAddresses }),
       checkout: createCheckoutService({ database, useroutr }),
-      webhooks: createWebhookService({ database, useroutr }),
+      webhooks: createWebhookService({
+        database,
+        useroutr,
+        alertsOperator: config.operatorEmail !== null,
+      }),
       outbox: createOutboxSender({
         database,
         emailDelivery,
+        pushDelivery: createExpoPushDelivery({ accessToken: config.expoAccessToken }),
         useroutr,
         appUrl: config.appUrl,
         network: config.stellar.network,
+        operatorEmail: config.operatorEmail,
       }),
     };
   }
@@ -67,6 +80,8 @@ function appServices(): AppServices {
 }
 
 export const authService = () => appServices().auth;
+export const profileService = () => appServices().profiles;
+export const deviceService = () => appServices().devices;
 export const payoutAddressService = () => appServices().payoutAddresses;
 export const requestService = () => appServices().requests;
 export const checkoutService = () => appServices().checkout;

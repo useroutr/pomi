@@ -11,7 +11,7 @@ export function testDatabase(): Database {
 }
 
 export async function emptyTables(database: Database) {
-  await database.$executeRaw`TRUNCATE "users", "payout_addresses", "requests", "request_intents", "request_payments", "outbox_emails", "refunds", "webhook_events", "sign_in_codes", "sessions" CASCADE`;
+  await database.$executeRaw`TRUNCATE "users", "payout_addresses", "requests", "request_intents", "request_payments", "outbox_emails", "outbox_pushes", "devices", "refunds", "webhook_events", "sign_in_codes", "sessions" CASCADE`;
 }
 
 export const RECEIVER_ACCOUNT = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN";

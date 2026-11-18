@@ -35,6 +35,15 @@ export interface ServerConfig {
   walletConnectProjectId: string | null;
   // The bearer token scheduled jobs present. Without it, they refuse to run.
   cronSecret: string | null;
+  // Who is told when a refund needs a destination (docs/spec.md, section 9).
+  // Without it the refund is still recorded, and nobody is emailed.
+  operatorEmail: string | null;
+  // The request header the host sets to the client's IP address, such as
+  // x-real-ip on Vercel. Only a header the host overwrites can be trusted.
+  // Without it, checkouts are limited per visitor only.
+  clientIpHeader: string | null;
+  // Sent with Expo push requests when the Expo project requires it.
+  expoAccessToken: string | null;
 }
 
 const DEFAULT_HORIZON_URLS: Record<StellarNetwork, string> = {
@@ -68,6 +77,14 @@ const environmentSchema = z
     STELLAR_HORIZON_URL: z.url({ protocol: /^https?$/ }).optional(),
     WALLETCONNECT_PROJECT_ID: z.string().trim().min(1).optional(),
     CRON_SECRET: z.string().min(32, "must be at least 32 characters").optional(),
+    OPERATOR_EMAIL: z.email().optional(),
+    CLIENT_IP_HEADER: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(/^[a-z0-9-]+$/, "must be a header name")
+      .optional(),
+    EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
     AUTH_SECRET: z.string().min(32, "must be at least 32 characters (openssl rand -base64 32)"),
     USEROUTR_API_KEY: z
       .string()
@@ -86,6 +103,15 @@ const environmentSchema = z
         code: "custom",
         path: ["EMAIL_DELIVERY"],
         message: "console delivery is for local development; a production build needs resend",
+      });
+    }
+    // Without a trusted client address, one person could open checkouts
+    // without limit by clearing cookies.
+    if (variables.NODE_ENV === "production" && variables.CLIENT_IP_HEADER === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["CLIENT_IP_HEADER"],
+        message: "is required in a production build (x-real-ip on Vercel)",
       });
     }
     // Session cookies are Secure in a production build, so the app must be
@@ -142,6 +168,9 @@ export function parseServerConfig(environment: Record<string, string | undefined
     },
     walletConnectProjectId: variables.WALLETCONNECT_PROJECT_ID ?? null,
     cronSecret: variables.CRON_SECRET ?? null,
+    operatorEmail: variables.OPERATOR_EMAIL ?? null,
+    clientIpHeader: variables.CLIENT_IP_HEADER ?? null,
+    expoAccessToken: variables.EXPO_ACCESS_TOKEN ?? null,
   };
 }
 

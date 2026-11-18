@@ -2,11 +2,13 @@ import { product } from "@pomi/shared";
 import { UseroutrError } from "@useroutr/sdk";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { payoutAddressService, requestService } from "@/server/app-services";
+import { payoutAddressService, profileService, requestService } from "@/server/app-services";
 import { currentUser } from "@/server/auth/current-user";
 import { serverConfig } from "@/server/config";
 import { NewRequestForm } from "./new-request-form";
+import { PayBoxForm } from "./pay-box-form";
 import { PayoutAddressForm } from "./payout-address-form";
+import { ProfileForm } from "./profile-form";
 import { RequestList } from "./request-list";
 import { SignOutButton } from "./sign-out-button";
 
@@ -20,8 +22,9 @@ export default async function DashboardPage() {
     redirect("/sign-in");
   }
   const config = serverConfig();
-  const [payoutAddress, catalog] = await Promise.all([
+  const [payoutAddress, profile, catalog] = await Promise.all([
     payoutAddressService().payoutAddress(user.id),
+    profileService().profile(user.id),
     useroutrCatalog(user.id),
   ]);
 
@@ -39,8 +42,35 @@ export default async function DashboardPage() {
       )}
 
       <section className="card">
+        <h2>Your page</h2>
+        <ProfileForm
+          handle={profile.handle}
+          displayName={profile.displayName}
+          appUrl={config.appUrl}
+        />
+      </section>
+
+      <section className="card">
         <h2>Where you get paid</h2>
         <PayoutAddressForm current={payoutAddress?.address ?? null} />
+      </section>
+
+      <section className="card">
+        <h2>Pay box</h2>
+        <p className="muted small">
+          On your page, anyone can pay you in one step, as often as they like.
+        </p>
+        {catalog === null ? (
+          <p className="error">Payments are unavailable right now. Try again in a moment.</p>
+        ) : payoutAddress === null ? (
+          <p className="muted">Add the address you want to be paid at first.</p>
+        ) : (
+          <PayBoxForm
+            payBox={catalog.payBox}
+            assets={catalog.assets}
+            currentPayoutAddress={payoutAddress.address}
+          />
+        )}
       </section>
 
       <section className="card">
@@ -74,11 +104,12 @@ export default async function DashboardPage() {
 // reached the dashboard still loads, and says so where it matters.
 async function useroutrCatalog(userId: string) {
   try {
-    const [assets, requests] = await Promise.all([
+    const [assets, requests, payBox] = await Promise.all([
       requestService().requestableAssets(),
       requestService().listRequests(userId),
+      requestService().payBox(userId),
     ]);
-    return { assets: assets.map(({ id, symbol }) => ({ id, symbol })), requests };
+    return { assets: assets.map(({ id, symbol }) => ({ id, symbol })), requests, payBox };
   } catch (error) {
     if (error instanceof UseroutrError) {
       return null;

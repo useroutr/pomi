@@ -70,7 +70,7 @@ The whole app is **one Useroutr application** with one API key, held by its back
 | App concept | Useroutr |
 |---|---|
 | A request | The app's own record. Useroutr knows nothing of it. |
-| A payer opening a request | A funding intent. `destination` is the receiver's address and asset, and `reference` is the request id. For a single-use request the idempotency key is the request id and the intent's number (`pomi:<request>:<n>`), so visitors arriving together send the same key and get the same intent. For a reusable request it will be the visit id. |
+| A payer opening a request | A funding intent. `destination` is the receiver's address and asset, and `reference` is the request id. For a single-use request the idempotency key is the request id and the intent's number (`pomi:<request>:<n>`), so visitors arriving together send the same key and get the same intent. For a reusable request it is the visit (`pomi:<request>:<visitor>:<n>`): each visitor's own intent, and a new one when they choose another amount or come back after it expired. |
 | Paid | `funding.credited` for that intent |
 | Partly paid, expired, failed | `funding.partially_funded`, `funding.expired`, `funding.failed` |
 | A payment that cannot complete the request | `payment.rejected` and `refund.*` events. Useroutr refunds the payer by its own rules, and sends `refund.destination_required` when it cannot tell where the money should go (section 9). |
@@ -129,6 +129,9 @@ visitor and IP address can open.
   - show and scan QR codes
   - list requests and see their status
   - push notifications
+
+  The app reads `EXPO_PUBLIC_APP_URL` for the web app it talks to. Push needs an EAS project id
+  (`eas init`) and a real device; without either, payments still arrive by email.
 
   In the first version it opens the pay page in the system in-app browser (SFSafariViewController
   or Custom Tabs). `@useroutr/checkout-react` is DOM-only, and a native checkout is a later
@@ -206,14 +209,15 @@ transaction.
 | `users` | id, email, handle, display_name | email unique; handle unique, and its format checked |
 | `payout_addresses` | user_id, address, active, verified_at | one active address per user; the address is a Stellar account (`G…`) |
 | `requests` | id, user_id, payout_address_id, kind (`single` / `reusable`), amount_kind (`fixed` / `open`), amount, minimum_amount, asset_id, note, listed, pay_box, status (`open` / `paid` / `closed`), ends_at | a fixed request has an amount and no minimum, an open one has no amount; amounts are positive; a single-use request is fixed; the pay box is reusable and one per user; a note is at most 280 characters |
-| `request_intents` | request_id, funding_intent_id, funding_token, visit_id, amount, exclusive, state (`open` / `closed`), expires_at | `funding_intent_id` unique; one per request and visit; an exclusive intent has no visit and any other has one; one open intent per single-use request (`exclusive`), by a partial unique index |
+| `request_intents` | request_id, funding_intent_id, funding_token, visit_id, visitor_id, client_key, amount, exclusive, state (`open` / `closed`), expires_at | `funding_intent_id` unique; one per request and visit; an exclusive intent has no visit and any other has one; one open intent per single-use request (`exclusive`), by a partial unique index. `client_key` is an HMAC of the client's address, never the address. |
 | `request_payments` | request_id, funding_intent_id, amount, asset_id, payment_transaction_hash, settlement_transaction_hash, credited_at | `funding_intent_id` unique, so one credit counts once |
-| `outbox_emails` | kind, request_payment_id, attempts, claimed_until, sent_at | one email of each kind per payment |
+| `outbox_emails` | kind (`payment_received` / `refund_destination_required`), request_payment_id, refund_id, attempts, claimed_until, sent_at | one email of each kind per payment or refund; a payment email names a payment and a refund email a refund |
+| `outbox_pushes` | request_payment_id, attempts, claimed_until, sent_at | one per payment |
 | `refunds` | refund_id, funding_intent_id, status, destination_required_at | `refund_id` unique |
 | `webhook_events` | event_id, type, received_at, processed_at | `event_id` unique |
 | `sign_in_codes` | email, code_hash, attempts, expires_at, consumed_at | email lowercase; the code is stored as an HMAC keyed by the server's secret |
 | `sessions` | user_id, token_hash, expires_at, revoked_at | `token_hash` unique |
-| `devices` (phase 2) | user_id, push_token, platform | `push_token` unique |
+| `devices` | user_id, push_token, platform | `push_token` unique, so a phone belongs to whoever signed in on it last |
 
 Request ids are random and unguessable, so an unlisted request is private to whoever has its
 link. An open-amount intent records the amount the payer chose. Partial unique indexes and check
@@ -227,18 +231,20 @@ shape `{ "error": { "code", "message" } }`, and its message can be shown to the 
 
 | Endpoint | Who | Does |
 |---|---|---|
-| `POST /auth/code`, `POST /auth/verify` | anyone | Email sign-in. Verifying sets the session cookie. |
+| `POST /auth/code`, `POST /auth/verify` | anyone | Email sign-in. Verifying sets the session cookie, or with `client: "mobile"` returns the token for the app's secure store. The app sends it as `Authorization: Bearer`. |
+| `GET /me`, `PUT /me/display-name` | receiver | The receiver's email, handle and display name |
 | `POST /auth/sign-out` | receiver | Ends the session |
 | `POST /me/handle` | receiver | Claim a handle, once |
 | `GET/PUT /me/payout-address` | receiver | Read or set the payout address, with the checks in section 6 |
-| `GET/PUT /me/pay-box` | receiver | Read or set the pay box: asset, fixed amount or the payer's choice, minimum |
-| `POST /requests`, `GET /requests`, `POST /requests/:id/close` | receiver | Create, list and close requests. `PATCH /requests/:id`, to list or unlist one, comes with handle pages. |
+| `GET/PUT/DELETE /me/pay-box` | receiver | Read, set or turn off the pay box: asset, fixed amount or the payer's choice, minimum. Saving it moves it to the current payout address. |
+| `GET /assets` | receiver | The assets a request can ask for, from Useroutr's list |
+| `POST /requests`, `GET /requests`, `PATCH /requests/:id`, `POST /requests/:id/close` | receiver | Create (single-use or reusable, listed or not, with an optional end date), list, list or unlist, and close requests |
 | `GET /profiles/:handle` | anyone | A handle page: name, verification mark, pay box and listed requests |
-| `GET /r/:id` | anyone | The public view of a request, for the mobile app (phase 2). The web pay page renders it on the server. |
+| `GET /r/:id` | anyone | Not built: the web pay page renders the request on the server, and the app opens that page. |
 | `POST /r/:id/checkout` | anyone | Reuses or creates the funding intent; returns its funding token for the checkout. For an open amount, the body carries the payer's amount. |
 | `POST /webhooks/useroutr` | Useroutr | Signed events |
 | `GET /jobs/send-emails` | the scheduler, with `CRON_SECRET` | Sends emails whose first send failed |
-| `POST /devices` | receiver | Register a push token |
+| `POST/DELETE /devices` | receiver | Register or forget an Expo push token |
 
 ## 9. Security and abuse
 
@@ -249,7 +255,10 @@ shape `{ "error": { "code", "message" } }`, and its message can be shown to the 
   phishing. Any request or handle page can be reported, and the operator can close it.
 - Handles that would pass for Pomi, Useroutr or the app's own pages are reserved. Unlisted
   requests have random ids, so a handle page never reveals them.
-- Checkout creation is rate limited per visitor and per IP address.
+- Checkout creation is rate limited: each visitor (a random id in an HttpOnly cookie) may start 5
+  new intents in 10 minutes, and each client address 20. Reopening a live intent costs nothing.
+  The address comes only from a header the host sets (`CLIENT_IP_HEADER`, `x-real-ip` on
+  Vercel), which a production build requires, and is stored only as an HMAC.
 - No funds, keys or balances exist in the app to steal. The sensitive data is email addresses and
   payout addresses, and neither is logged.
 - **Refund destinations.** The app is the Useroutr application, so it answers for refunds
