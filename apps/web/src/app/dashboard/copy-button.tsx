@@ -1,8 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import ui from "@/app/components/ui.module.css";
 
-export function CopyButton({ text, label = "Copy link" }: { text: string; label?: string }) {
+export function CopyButton({
+  text,
+  label = "Copy link",
+  className = [ui.secondaryButton, ui.compact].join(" "),
+}: {
+  text: string;
+  label?: string;
+  className?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -19,7 +28,7 @@ export function CopyButton({ text, label = "Copy link" }: { text: string; label?
   }
 
   return (
-    <button type="button" className="secondary" onClick={() => void copy()}>
+    <button type="button" className={className} onClick={() => void copy()}>
       {copied ? "Copied" : label}
     </button>
   );

@@ -3,13 +3,12 @@
 import { networkList, networkName } from "@pomi/shared";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { TokenMark } from "@/app/components/token-mark";
 import styles from "./landing.module.css";
 
 export interface AskOption {
   symbol: string;
   network: string;
-  tokenLogo: string | null;
-  networkLogo: string | null;
 }
 
 export interface PayWithNetwork {
@@ -109,7 +108,7 @@ export function AskCard({ options, payWith }: { options: AskOption[]; payWith: P
                   setPicking(!picking);
                 }}
               >
-                <TokenMark option={asset} />
+                <TokenMark symbol={asset.symbol} network={asset.network} />
                 <span>
                   {asset.symbol}
                   <small>{networkName(asset.network)}</small>
@@ -130,7 +129,7 @@ export function AskCard({ options, payWith }: { options: AskOption[]; payWith: P
                           setPicking(false);
                         }}
                       >
-                        <TokenMark option={option} />
+                        <TokenMark symbol={option.symbol} network={option.network} />
                         <span>
                           {option.symbol}
                           <small>on {networkName(option.network)}</small>
@@ -173,16 +172,5 @@ export function AskCard({ options, payWith }: { options: AskOption[]; payWith: P
       </Link>
       <p className={styles.askFoot}>It lands in your own wallet. Pomi never holds it.</p>
     </div>
-  );
-}
-
-function TokenMark({ option }: { option: AskOption }) {
-  return (
-    <span className={styles.tokenMark} aria-hidden="true">
-      {option.tokenLogo !== null && <img src={option.tokenLogo} alt="" />}
-      {option.networkLogo !== null && (
-        <img className={styles.tokenBadge} src={option.networkLogo} alt="" />
-      )}
-    </span>
   );
 }

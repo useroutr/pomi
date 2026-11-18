@@ -1,24 +1,16 @@
 import { networkName, product } from "@pomi/shared";
 import { UseroutrError } from "@useroutr/sdk";
-import { Bricolage_Grotesque } from "next/font/google";
 import Link from "next/link";
 import { connection } from "next/server";
 import { requestService } from "@/server/app-services";
 import { serverConfig } from "@/server/config";
+import { networkLogo, tokenLogo, walletLogo } from "./components/logos";
+import { PomiLogo, PomiMark } from "./components/pomi-logo";
+import { QrCard } from "./components/qr-card";
 import { type AskOption, AskCard, type PayWithNetwork } from "./landing/ask-card";
 import { FloatingLogos } from "./landing/floating-logos";
 import styles from "./landing/landing.module.css";
-import { networkLogo, tokenLogo, walletLogo } from "./landing/logos";
-import { PomiLogo, PomiMark } from "./landing/pomi-logo";
-import { QrCard } from "./landing/qr-card";
 import { usdcFirst } from "./landing/usdc-first";
-
-// Loaded here, not in the layout, so only the landing page downloads it.
-const display = Bricolage_Grotesque({
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-});
 
 const GITHUB_URL = "https://github.com/useroutr/pomi";
 const USEROUTR_URL = "https://www.useroutr.com";
@@ -61,8 +53,6 @@ export default async function HomePage() {
   const options: AskOption[] = usdcFirst(assets).map((asset) => ({
     symbol: asset.symbol,
     network: asset.network,
-    tokenLogo: tokenLogo(asset.symbol),
-    networkLogo: networkLogo(asset.network),
   }));
   const networks: PayWithNetwork[] = payWith.map((entry) => ({
     network: entry.network,
@@ -70,7 +60,7 @@ export default async function HomePage() {
   }));
 
   return (
-    <div className={[styles.page, display.variable].join(" ")}>
+    <div className={styles.page}>
       <header className={styles.nav}>
         <Link href="/" className={styles.navLogo}>
           <PomiLogo className={styles.logo} />
@@ -183,7 +173,13 @@ export default async function HomePage() {
         <section id="your-page" className={styles.section} aria-labelledby="your-page-title">
           <div className={[styles.split, styles.splitReverse].join(" ")}>
             {/* A sample card; its code opens Pomi itself, and its label says so. */}
-            <QrCard link={appUrl} label={displayHost(appUrl)} name="Your name" initial="Y" />
+            <QrCard
+              link={appUrl}
+              label={displayHost(appUrl)}
+              name="Your name"
+              initial="Y"
+              className={styles.qrTilt}
+            />
             <div>
               <h2 id="your-page-title" className={styles.sectionTitle}>
                 One link for everything.

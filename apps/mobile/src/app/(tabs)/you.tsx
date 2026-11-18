@@ -1,4 +1,4 @@
-import { networkName } from "@pomi/shared";
+import { formatAmount, networkName } from "@pomi/shared";
 import { router, useFocusEffect } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useState } from "react";
@@ -14,7 +14,6 @@ import { VibrantSurface } from "@/components/vibrant-surface";
 import { addressFormat } from "@/lib/address-format";
 import { assetsSchema, meSchema, payBoxSchema, payoutAddressesSchema } from "@/lib/api";
 import { APP_URL, displayLink, pageLink } from "@/lib/config";
-import { formatAmount } from "@/lib/format";
 import {
   enableNotifications,
   type NotificationPermission,

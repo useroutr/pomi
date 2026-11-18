@@ -1,5 +1,5 @@
 import { drawQrCode, POMI_MARK, roundedSquare } from "@pomi/shared";
-import styles from "./landing.module.css";
+import styles from "./qr-card.module.css";
 
 // A page's QR card as the app shows it (Linktree's layout): one light color,
 // the person on top, the code drawn straight onto the card in one ink, and
@@ -9,11 +9,13 @@ export function QrCard({
   label,
   name,
   initial,
+  className,
 }: {
   link: string;
   label: string;
   name: string;
   initial: string;
+  className?: string;
 }) {
   const code = drawQrCode(link);
   const quiet = 1;
@@ -21,7 +23,9 @@ export function QrCard({
   const markModules = code.clear - 2;
   const markAt = (code.count - markModules) / 2;
   return (
-    <figure className={styles.qrCard}>
+    <figure
+      className={className === undefined ? styles.qrCard : [styles.qrCard, className].join(" ")}
+    >
       <span className={styles.qrAvatar} aria-hidden="true">
         {initial}
       </span>

@@ -1,0 +1,362 @@
+/* What payers see: one card on the brand light, laid out as Uniswap lays out
+   buying (what it is for on top, the amount as the subject, one button). */
+
+.column {
+  display: grid;
+  gap: 16px;
+  width: min(100%, 480px);
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 48px) 16px 48px;
+}
+
+.card {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(20px);
+}
+
+.panel {
+  display: grid;
+  gap: 8px;
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 8px;
+}
+
+.whoText {
+  display: grid;
+  min-width: 0;
+}
+
+.whoName {
+  margin: 0;
+  overflow: hidden;
+  font-size: 18px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.whoSub {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.amountBox {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 20px 16px 28px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.amountLabel {
+  justify-self: start;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.amount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0 10px;
+  margin: 8px 0 0;
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(48px, 14vw, 72px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.amountSymbol {
+  color: var(--muted);
+  font-size: 0.42em;
+  letter-spacing: -0.01em;
+}
+
+/* Sized as the amount, so the symbol beside it scales with it. */
+.amountEntry {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  max-width: 100%;
+  margin-top: 8px;
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(48px, 14vw, 72px);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.amountInput {
+  min-width: 1.2ch;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(48px, 14vw, 72px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+.amountInput::placeholder {
+  color: var(--muted);
+  opacity: 0.45;
+}
+
+.amountEntry:focus-within {
+  border-radius: 8px;
+  box-shadow: 0 2px 0 0 var(--violet);
+}
+
+.assetRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--fill);
+}
+
+.assetText {
+  display: grid;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.assetText strong {
+  font-size: 16px;
+}
+
+.assetText span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.assetEnd {
+  margin-left: auto;
+}
+
+/* The receiver's own words, drawn as a message so they never pass for
+   Pomi's. */
+.note {
+  justify-self: start;
+  max-width: 100%;
+  margin: 4px 8px;
+  padding: 10px 14px;
+  border-radius: 18px 18px 18px 6px;
+  background: var(--violet-soft);
+  color: var(--ink);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.details {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 16px 4px;
+  font-size: 14px;
+}
+
+.detailRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.detailRow dt {
+  color: var(--muted);
+}
+
+.detailRow dd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.address {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+}
+
+.action {
+  display: grid;
+  gap: 10px;
+  padding: 8px 8px 12px;
+}
+
+.action > p {
+  text-align: center;
+}
+
+.checkout {
+  display: grid;
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+/* A request that takes no payment, or one just paid. */
+.state {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 24px 16px 20px;
+  text-align: center;
+}
+
+.state p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.state strong {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 22px;
+}
+
+.stateIcon,
+.stateIconDone {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--fill);
+  color: var(--muted);
+}
+
+.stateIconDone {
+  background: var(--success);
+  color: #ffffff;
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--success) 18%, transparent);
+}
+
+.stateIcon svg,
+.stateIconDone svg {
+  width: 28px;
+  height: 28px;
+}
+
+/* A receiver's page */
+
+.profile {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 16px 0 8px;
+  text-align: center;
+}
+
+.profile h1 {
+  max-width: 100%;
+  margin: 10px 0 0;
+  font-size: clamp(30px, 7vw, 40px);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.profile p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.sectionTitle {
+  margin: 12px 4px 0;
+  font-size: 20px;
+}
+
+.rows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color 0.15s,
+    transform 0.15s;
+}
+
+.row:hover {
+  border-color: color-mix(in srgb, var(--violet) 45%, var(--line));
+  transform: translateY(-1px);
+}
+
+.rowText {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.rowText strong {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.rowText span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowPay {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 10px 8px 14px;
+  border-radius: 999px;
+  background: var(--violet);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.rowPay svg {
+  width: 16px;
+  height: 16px;
+}

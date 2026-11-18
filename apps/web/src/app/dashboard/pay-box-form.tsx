@@ -1,10 +1,12 @@
 "use client";
 
-import { shortenAddress } from "@pomi/shared";
+import { formatAmount, shortenAddress } from "@pomi/shared";
 import { useRouter } from "next/navigation";
 import { type SubmitEvent, useState } from "react";
+import ui from "@/app/components/ui.module.css";
 import { callApi } from "@/lib/api-client";
-import { type RequestableAsset } from "./new-request-form";
+import { AssetSelect, type RequestableAsset } from "./asset-select";
+import styles from "./dashboard.module.css";
 
 export interface DashboardPayBox {
   open: boolean;
@@ -14,6 +16,14 @@ export interface DashboardPayBox {
   amount: string | null;
   minimumAmount: string | null;
   payoutAddress: string;
+}
+
+function describe(payBox: DashboardPayBox): string {
+  const asked =
+    payBox.amount === null
+      ? `Any amount of ${payBox.assetSymbol}${payBox.minimumAmount === null ? "" : `, at least ${formatAmount(payBox.minimumAmount)}`}`
+      : `${formatAmount(payBox.amount)} ${payBox.assetSymbol}`;
+  return `${asked}, paid to ${shortenAddress(payBox.assetNetwork, payBox.payoutAddress)}.`;
 }
 
 export function PayBoxForm({
@@ -61,20 +71,19 @@ export function PayBoxForm({
   }
 
   return (
-    <form className="form" onSubmit={(event) => void save(event)}>
+    <form className={styles.form} onSubmit={(event) => void save(event)}>
       {payBox !== null && (
-        <p className="muted small">
-          {payBox.open ? "On your page now: " : "Turned off. It was: "}
-          {payBox.amount === null
-            ? `any amount of ${payBox.assetSymbol}${payBox.minimumAmount === null ? "" : `, at least ${payBox.minimumAmount}`}`
-            : `${payBox.amount} ${payBox.assetSymbol}`}
-          , paid to {shortenAddress(payBox.assetNetwork, payBox.payoutAddress)}.
+        <p className={styles.status}>
+          <span className={payBox.open ? ui.chipPaid : ui.chip}>
+            {payBox.open ? "On your page" : "Off"}
+          </span>
+          {describe(payBox)}
           {payBox.payoutAddress !== currentPayoutAddress &&
             " Save it again to use your new address."}
         </p>
       )}
-      <div className="row">
-        <label className="choice">
+      <div className={ui.segmented} role="radiogroup" aria-label="Amount">
+        <label>
           <input
             type="radio"
             name="pay-box-kind"
@@ -83,9 +92,9 @@ export function PayBoxForm({
               setPayerChooses(true);
             }}
           />
-          Payer chooses the amount
+          Payer chooses
         </label>
-        <label className="choice">
+        <label>
           <input
             type="radio"
             name="pay-box-kind"
@@ -94,16 +103,20 @@ export function PayBoxForm({
               setPayerChooses(false);
             }}
           />
-          A fixed amount
+          Fixed amount
         </label>
       </div>
-      <div className="row">
-        <div className="field grow">
-          <label htmlFor="pay-box-amount">{payerChooses ? "Minimum (optional)" : "Amount"}</label>
+      <div className={styles.amountBox}>
+        <label className={ui.label} htmlFor="pay-box-amount">
+          {payerChooses ? "At least (optional)" : "Amount"}
+        </label>
+        <div className={styles.amountRow}>
           <input
             id="pay-box-amount"
+            className={styles.amountInput}
             inputMode="decimal"
             autoComplete="off"
+            placeholder="0"
             value={payerChooses ? minimumAmount : amount}
             onChange={(event) => {
               if (payerChooses) {
@@ -114,33 +127,25 @@ export function PayBoxForm({
             }}
             required={!payerChooses}
           />
-        </div>
-        <div className="field">
-          <label htmlFor="pay-box-asset">Asset</label>
-          <select
-            id="pay-box-asset"
-            value={assetId}
-            onChange={(event) => {
-              setAssetId(event.target.value);
-            }}
-          >
-            {assets.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {asset.symbol}
-              </option>
-            ))}
-          </select>
+          <label className={ui.visuallyHidden} htmlFor="pay-box-asset">
+            Asset
+          </label>
+          <AssetSelect id="pay-box-asset" assets={assets} value={assetId} onChange={setAssetId} />
         </div>
       </div>
-      {error !== null && <p className="error">{error}</p>}
-      <div className="row">
-        <button type="submit" disabled={pending}>
+      {error !== null && (
+        <p className={ui.error} role="alert">
+          {error}
+        </p>
+      )}
+      <div className={styles.buttons}>
+        <button type="submit" className={ui.primaryButton} disabled={pending}>
           {payBox?.open === true ? "Save pay box" : "Turn on pay box"}
         </button>
         {payBox?.open === true && (
           <button
             type="button"
-            className="secondary"
+            className={ui.ghostButton}
             disabled={pending}
             onClick={() => void turnOff()}
           >

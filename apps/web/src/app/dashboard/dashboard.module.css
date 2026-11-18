@@ -1,0 +1,553 @@
+/* A receiver's dashboard, laid out as Uniswap lays out a portfolio: who you
+   are and what you hold on top, the list as the subject, actions beside it. */
+
+.main {
+  display: grid;
+  gap: 16px;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px clamp(16px, 4vw, 40px) 64px;
+}
+
+.email {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+  gap: 16px;
+}
+
+/* The page card: the receiver's link on the app's vibrant card. */
+.pageCard {
+  display: grid;
+  align-content: space-between;
+  gap: 24px;
+  min-height: 220px;
+  padding: 24px;
+  border-radius: 28px;
+}
+
+.pageWho {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.pageAvatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #5a2fe6;
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.pageText {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.soft {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.pageName {
+  margin: 0;
+  overflow: hidden;
+  font-size: clamp(26px, 4vw, 34px);
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pageUrl {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.pageActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.claim {
+  display: grid;
+  gap: 10px;
+}
+
+.claimRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 16px;
+  border-radius: 18px;
+  background: #ffffff;
+  color: #15121c;
+}
+
+.claimRow span {
+  flex: none;
+  color: #5f5a6b;
+  font-size: 15px;
+}
+
+.claimRow input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: #15121c;
+  font-size: 16px;
+  font-weight: 600;
+  outline: none;
+}
+
+.claimHint {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 13px;
+}
+
+.claimError {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #b42318;
+  font-size: 14px;
+}
+
+/* What has been paid this month, one line per asset. */
+.summary {
+  align-content: space-between;
+  border-radius: 28px;
+}
+
+.summaryLabel {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.totals {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.totals li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.totals li > span:first-child {
+  align-self: center;
+}
+
+.totalAmount {
+  overflow: hidden;
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.totalSymbol {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.nothing {
+  margin: 0;
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.summaryMeta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.columns {
+  display: grid;
+  grid-template-areas:
+    "list create"
+    "list settings";
+  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+  grid-template-rows: auto 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.create {
+  grid-area: create;
+}
+
+.list {
+  grid-area: list;
+}
+
+.settings {
+  display: grid;
+  grid-area: settings;
+  gap: 16px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.unavailable {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* Requests, as rows of tokens */
+
+.requests {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.request {
+  display: grid;
+  gap: 10px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.request:first-child {
+  padding-top: 4px;
+  border-top: 0;
+}
+
+.requestHead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.requestText {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.requestText strong {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.requestText span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.meta {
+  margin: 0 0 0 54px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.payments {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 0 54px;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.payments li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.paymentAmount {
+  color: var(--success-ink);
+  font-weight: 700;
+}
+
+.payments a {
+  color: var(--violet);
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: 54px;
+}
+
+.empty {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.empty strong {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 20px;
+}
+
+.empty p {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Forms in the side column */
+
+.form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+/* The amount and asset of a new request, as a swap card's top box. */
+.amountBox {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--ground);
+}
+
+.amountBox:focus-within {
+  border-color: var(--violet);
+}
+
+.amountRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* No width of its own, so a long field never widens the card. */
+.amountInput {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  outline: none;
+}
+
+.amountInput::placeholder {
+  color: var(--muted);
+  opacity: 0.45;
+}
+
+.assetPick {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.assetPick > span:first-child {
+  position: absolute;
+  left: 6px;
+  pointer-events: none;
+}
+
+.assetSelect {
+  min-height: 44px;
+  padding: 8px 34px 8px 42px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background-color: var(--surface);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.toggles {
+  display: grid;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--fill);
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.created {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--success-soft);
+  color: var(--success-ink);
+}
+
+.created p {
+  margin: 0;
+  font-weight: 600;
+}
+
+.createdLink {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+}
+
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.address {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--fill);
+}
+
+.address img {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.address code {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* The page's QR card, opened over the dashboard. */
+.dialog {
+  width: min(calc(100% - 32px), 400px);
+  padding: 24px 20px 20px;
+  border: 0;
+  border-radius: 28px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
+}
+
+.dialog::backdrop {
+  background: rgba(14, 12, 20, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.dialogBody {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.dialogBody h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+@media (max-width: 960px) {
+  .top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .columns {
+    grid-template-areas:
+      "create"
+      "list"
+      "settings";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .email {
+    display: none;
+  }
+
+  .meta,
+  .payments,
+  .actions {
+    margin-left: 0;
+  }
+
+  .requestHead {
+    flex-wrap: wrap;
+  }
+
+  .chips {
+    justify-content: flex-start;
+    width: 100%;
+    padding-left: 54px;
+  }
+}

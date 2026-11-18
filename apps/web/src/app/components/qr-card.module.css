@@ -1,0 +1,62 @@
+/* A page's QR card as the app draws it: one light color, the person on top,
+   the code in one ink, and the link under it. */
+
+.qrCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  justify-self: center;
+  width: min(100%, 340px);
+  margin: 0;
+  padding: 28px 24px 24px;
+  border-radius: 32px;
+  background: #e6dcff;
+  color: #26136b;
+  box-shadow: 0 32px 60px -30px rgba(38, 19, 107, 0.55);
+}
+
+.qrAvatar {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #26136b;
+  color: #e6dcff;
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.qrCode {
+  width: 100%;
+  max-width: 240px;
+  height: auto;
+}
+
+.qrCard figcaption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.qrCard strong {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 24px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.qrLink {
+  max-width: 100%;
+  padding: 8px 14px;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  text-align: center;
+}

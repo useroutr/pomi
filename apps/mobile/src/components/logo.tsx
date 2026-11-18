@@ -1,4 +1,4 @@
-import { POMI_MARK } from "@pomi/shared";
+import { POMI_ICON_COIN, POMI_MARK } from "@pomi/shared";
 import { StyleSheet, View } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { BRAND_VIOLET } from "@/theme/palette";
@@ -26,10 +26,6 @@ export function PomiMark({
   );
 }
 
-// The app icon's face: the white mark on the brand violet, its coin in the
-// coral of the old orb. Where the app stands for itself, as at launch.
-export const ICON_COIN = "#FF8A5B";
-
 export function PomiTile({ size }: { size: number }) {
   return (
     <View
@@ -38,7 +34,7 @@ export function PomiTile({ size }: { size: number }) {
       accessibilityLabel="Pomi"
       style={[styles.tile, { width: size, height: size, borderRadius: size * 0.27 }]}
     >
-      <PomiMark size={size * 0.62} color="#FFFFFF" dotColor={ICON_COIN} />
+      <PomiMark size={size * 0.62} color="#FFFFFF" dotColor={POMI_ICON_COIN} />
     </View>
   );
 }

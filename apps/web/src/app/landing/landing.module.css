@@ -1,61 +1,9 @@
-/* Pomi's landing page. Colors are the app's own (apps/mobile/src/theme). The
-   grain is SVG noise drawn by the browser at screen resolution, so it stays
-   fine at any size; the soft color behind it is radial gradients, which read
-   as blurred light without blurring anything. */
+/* Pomi's landing page. Colors, grain and type come from globals.css; the soft
+   color behind the hero is radial gradients, which read as blurred light
+   without blurring anything. */
 
 .page {
-  --ink: #15121c;
-  --muted: #5f5a6b;
-  --ground: #f6f4f9;
-  --surface: #ffffff;
-  --line: #e7e2ee;
-  --fill: #efecf4;
-  --violet: #6a3df5;
-  --violet-deep: #5a2fe6;
-  --violet-soft: #eee8ff;
-  --pink-soft: #ffe3f0;
-  --orange-soft: #ffeadd;
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-
   min-height: 100dvh;
-  background: var(--ground);
-  color: var(--ink);
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  .page {
-    --ink: #f5f2fa;
-    --muted: #a39db0;
-    --ground: #0e0c14;
-    --surface: #1a1722;
-    --line: #2a2533;
-    --fill: #25212f;
-    --violet: #8b6bff;
-    --violet-deep: #6a3df5;
-    --violet-soft: #241a45;
-    --pink-soft: #3a1630;
-    --orange-soft: #3a2112;
-  }
-}
-
-.page,
-.page *,
-.page *::before,
-.page *::after {
-  box-sizing: border-box;
-}
-
-.page h1,
-.page h2,
-.page h3 {
-  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
-  letter-spacing: -0.02em;
 }
 
 /* Navigation */
@@ -158,11 +106,7 @@
   position: absolute;
   inset: -10% -10% 0;
   z-index: -2;
-  background:
-    radial-gradient(42% 38% at 18% 12%, rgba(124, 92, 255, 0.28), transparent 70%),
-    radial-gradient(36% 34% at 84% 16%, rgba(255, 79, 163, 0.22), transparent 70%),
-    radial-gradient(40% 36% at 70% 92%, rgba(255, 140, 66, 0.2), transparent 70%),
-    radial-gradient(34% 30% at 10% 88%, rgba(72, 52, 210, 0.16), transparent 70%);
+  background: var(--aurora);
 }
 
 .aurora::after {
@@ -430,30 +374,6 @@
 .pickerOption:hover,
 .pickerOption[aria-selected="true"] {
   background: var(--fill);
-}
-
-.tokenMark {
-  position: relative;
-  display: inline-block;
-  width: 32px;
-  height: 32px;
-  flex: none;
-}
-
-.tokenMark img {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-}
-
-.tokenMark .tokenBadge {
-  position: absolute;
-  right: -3px;
-  bottom: -3px;
-  width: 15px;
-  height: 15px;
-  border: 2px solid var(--surface);
-  border-radius: 50%;
 }
 
 .askSwap {
@@ -739,60 +659,8 @@
   color: var(--muted);
 }
 
-/* The page QR card, as the app draws it */
-
-.qrCard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
-  justify-self: center;
-  width: min(100%, 340px);
-  margin: 0;
-  padding: 28px 24px 24px;
-  border-radius: 32px;
-  background: #e6dcff;
-  color: #26136b;
-  box-shadow: 0 32px 60px -30px rgba(38, 19, 107, 0.55);
+.qrTilt {
   transform: rotate(-2deg);
-}
-
-.qrAvatar {
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #26136b;
-  color: #e6dcff;
-  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
-  font-size: 24px;
-  font-weight: 700;
-}
-
-.qrCode {
-  width: 100%;
-  max-width: 240px;
-  height: auto;
-}
-
-.qrCard figcaption {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-
-.qrCard strong {
-  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
-  font-size: 24px;
-}
-
-.qrLink {
-  padding: 8px 14px;
-  border: 1.5px solid currentColor;
-  border-radius: 999px;
-  font-weight: 600;
 }
 
 .facts {
@@ -878,12 +746,8 @@
   overflow: hidden;
   padding: clamp(40px, 7vw, 72px) clamp(24px, 5vw, 56px);
   border-radius: 36px;
-  background-color: #5a2fe6;
-  background-image:
-    radial-gradient(52% 70% at 8% 4%, rgba(122, 82, 255, 0.95), transparent 70%),
-    radial-gradient(48% 60% at 92% 12%, rgba(255, 79, 163, 0.9), transparent 70%),
-    radial-gradient(56% 70% at 100% 100%, rgba(255, 140, 66, 0.95), transparent 70%),
-    radial-gradient(56% 70% at 0% 100%, rgba(38, 19, 120, 0.95), transparent 70%);
+  background-color: var(--violet-deep);
+  background-image: var(--mesh);
   color: #ffffff;
   isolation: isolate;
 }

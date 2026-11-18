@@ -8,3 +8,8 @@ export const POMI_MARK = {
   stem: "M18 55.57A37 37 0 0 0 35 70.82V95H18z",
   dot: { cx: 50, cy: 37, r: 7 },
 } as const;
+
+// The app icon's face is the white mark on the brand violet with its coin in
+// this coral, wherever Pomi stands for itself: the app icon, the launch screen
+// and the web sign-in.
+export const POMI_ICON_COIN = "#FF8A5B";
