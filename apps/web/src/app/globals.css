@@ -37,31 +37,6 @@ body {
     sans-serif;
 }
 
-.hero {
-  display: grid;
-  min-height: 100dvh;
-  place-content: center;
-  gap: 8px;
-  padding: 24px;
-  text-align: center;
-}
-
-.hero h1 {
-  margin: 0;
-  font-size: 48px;
-}
-
-.hero p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 18px;
-}
-
-.hero-link {
-  margin-top: 16px;
-  color: var(--foreground);
-}
-
 .panel {
   display: grid;
   max-width: 360px;

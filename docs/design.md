@@ -29,12 +29,12 @@ profile header over settings rows with colored icon tiles. Four things carry the
   cards. At night the ground turns near-black (`#0E0C14`) and the action a lighter violet.
   Every text color meets 4.5:1 on what it sits on.
 - **The mark.** A bold lowercase p whose bowl is a coin (a ring around a dot), its stem cut
-  from the bowl by a gap that follows the ring (`PomiMark` in `components/logo.tsx`). Like
-  Linktree's asterisk with its detached trunk, it is one flat color, a familiar glyph with one
-  deliberate break, and it reads at favicon size. The app icon is the white mark on the brand
-  violet with its coin in coral; the welcome screen sets it beside "pomi" in Bricolage
-  Grotesque Bold; it sits in the centre of every QR code. The orb survives only as the avatar
-  behind a receiver's initial.
+  from the bowl by a gap that follows the ring (`POMI_MARK` in `packages/shared/src/mark.ts`,
+  drawn by `PomiMark` in the app and on the web). Like Linktree's asterisk with its detached
+  trunk, it is one flat color, a familiar glyph with one deliberate break, and it reads at
+  favicon size. The app icon is the white mark on the brand violet with its coin in coral; the
+  welcome screen sets it beside "pomi" in Bricolage Grotesque Bold; it sits in the centre of
+  every QR code. The orb survives only as the avatar behind a receiver's initial.
 - **3D illustrations** in the same violet, pink and orange carry warmth where a screen would
   otherwise be empty: the first request, the code email, the wallet step, notifications and
   the paid moment.
@@ -78,12 +78,31 @@ step leaves a notice on Home, and asking for money then leads back to it.
 
 Drawn the way Linktree draws its QR cards: rounded modules, soft finder eyes and the mark in a
 cleared centre, all in one ink, straight onto a card of one light color with the receiver's
-initial above and the link below (`QrCode`, `ShareCard`). The page QR screen offers four cards
-(lavender, peach, blush, paper; `QR_COLORWAYS`), each ink at least 9.8:1 on its card. Codes
-stay dark on light, never inverted, because some wallets' scanners cannot read a light code on
-a dark ground. Error correction is H and Pomi's links fit in version 6, so the cleared centre
-never covers an alignment pattern. Every colorway was decoded by Apple's Vision framework at
-card size and at the 84-point size on Home, with the longest request and handle links.
+initial above and the link below (`QrCode`, `ShareCard`; the modules come from `drawQrCode` in
+`packages/shared/src/qr-paths.ts`, which the web landing page uses too). The page QR screen
+offers four cards (lavender, peach, blush, paper; `QR_COLORWAYS`), each ink at least 9.8:1 on
+its card. Codes stay dark on light, never inverted, because some wallets' scanners cannot read
+a light code on a dark ground. Error correction is H and Pomi's links fit in version 6, so the
+cleared centre never covers an alignment pattern. Every colorway was decoded by Apple's Vision
+framework at card size and at the 84-point size on Home, with the longest request and handle
+links.
+
+## The web landing page
+
+`apps/web/src/app/page.tsx`, styled in `landing/landing.module.css`, follows Uniswap's app
+page: a centred headline over the working object, here an ask card laid out like a swap card
+(what you ask for on top, what payers bring below, one button), with token, network and wallet
+logos floating around it at different depths, the far ones smaller, blurred and fainter. Its
+ground is the vibrant card's mesh of violet, pink and orange pools under SVG noise the browser
+draws, so the grain stays fine at any size; the closing card is the vibrant card itself. Below
+the hero: three steps on pastel cards, the networks payers can pay from, a page QR card drawn
+with the app's own code, and why Pomi can be trusted.
+
+The assets and networks come from Useroutr's catalog on each visit. When it cannot be read the
+card offers Stellar USDC and XLM and the network list is left out rather than guessed. Nothing
+on the card is created; its button leads to sign-in. Both color schemes follow the system,
+the floating logos hold still under reduced motion, and on phones only two show, at the edges
+beside the card.
 
 ## Pasting what was copied elsewhere
 
@@ -114,10 +133,10 @@ when something is refused.
 
 | Asset                                   | Source                                                                                                                                                                                  | License                                       |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| Token, network and wallet logos         | [web3icons](https://github.com/0xa3k5/web3icons), `@web3icons/core` 4.0.60, the "background" set, drawn with `react-native-svg`. 4.0.60 added the Stellar wallets (LOBSTR, Varial, xBull, Albedo, Rabet), Soroswap, Aquarius and BLND. Only imported logos are bundled; other assets get a monogram. | MIT |
+| Token, network and wallet logos         | [web3icons](https://github.com/0xa3k5/web3icons), `@web3icons/core` 4.0.60, the "background" set, drawn with `react-native-svg` (as images on the web landing page). 4.0.60 added the Stellar wallets (LOBSTR, Varial, xBull, Albedo, Rabet), Soroswap, Aquarius and BLND. Only imported logos are bundled; other assets get a monogram. | MIT |
 | Card grain                              | Rendered by `apps/mobile/scripts/render-textures.py` (seeded noise)                                                                                                                     | Pomi's own                                    |
 | 3D illustrations                        | [3dicons](https://github.com/realvjy/3dicons) by Vijay Verma, the "gradient" style, resized to 360 px in `apps/mobile/assets/illustrations`                                              | CC0 1.0                                       |
-| Display font                            | Bricolage Grotesque, `@expo-google-fonts/bricolage-grotesque`                                                                                                                           | SIL Open Font License 1.1                     |
+| Display font                            | Bricolage Grotesque, `@expo-google-fonts/bricolage-grotesque`; on the web, `next/font/google`, loaded by the landing page only                                                          | SIL Open Font License 1.1                     |
 | Interface icons                         | SF Symbols on iOS, Material Symbols on Android, through `expo-symbols`                                                                                                                  | Apple's and Google's terms for system symbols |
 | App icon, Android adaptive icon, splash | Rendered from the mark by `apps/mobile/scripts/render-icons.py`. iOS uses an Icon Composer bundle (`assets/pomi.icon`) so the system adds Liquid Glass and the dark and tinted looks.    | Pomi's own                                    |
 

@@ -50,6 +50,28 @@ cp apps/mobile/.env.example apps/mobile/.env
 pnpm --filter @pomi/mobile start
 ```
 
+### On an iPhone, without Expo Go
+
+A release build talks to production, `https://pomi.useroutr.com`. It needs Xcode with an Apple
+ID added (Settings, Accounts), and the iPhone connected by cable with Developer Mode on. In
+`apps/mobile`:
+
+```bash
+npx expo prebuild --platform ios --clean
+```
+
+A free Apple ID (a personal team) cannot sign push notifications, so until the app has a paid
+team, empty `ios/Pomi/Pomi.entitlements` of its `aps-environment` key after each prebuild. Then
+build and install it, choosing your team when asked:
+
+```bash
+EXPO_PUBLIC_APP_URL=https://pomi.useroutr.com npx expo run:ios --device --configuration Release
+```
+
+The first launch needs the developer trusted on the phone (Settings, General, VPN & Device
+Management). An app signed by a personal team stops opening after seven days; build it again.
+If CocoaPods fails with an encoding error, run it with `LANG=en_US.UTF-8`.
+
 ## Checks
 
 ```bash

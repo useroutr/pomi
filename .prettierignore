@@ -11,3 +11,5 @@ apps/web/src/generated/
 apps/web/prisma/migrations/
 docs/
 CLAUDE.md
+apps/mobile/ios/
+apps/mobile/android/
