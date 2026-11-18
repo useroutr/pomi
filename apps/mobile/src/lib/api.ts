@@ -180,6 +180,39 @@ export type ReceiverRequest = z.infer<typeof requestSchema>;
 
 export const requestsSchema = z.object({ requests: z.array(requestSchema) });
 
+// What reached the receiver, the pay box's payments included: exact totals
+// per asset, the latest payments, and payments per UTC day for a month.
+export const receivedActivitySchema = z.object({
+  totals: z.array(
+    z.object({
+      assetSymbol: z.string(),
+      assetNetwork: z.string(),
+      total: z.string(),
+      payments: z.number(),
+      thisMonth: z.string(),
+      paymentsThisMonth: z.number(),
+    }),
+  ),
+  recent: z.array(
+    z.object({
+      id: z.string(),
+      amount: z.string(),
+      assetSymbol: z.string(),
+      assetNetwork: z.string(),
+      creditedAt: z.string(),
+      settlementTransactionHash: z.string().nullable(),
+      requestId: z.string(),
+      payBox: z.boolean(),
+      note: z.string().nullable(),
+    }),
+  ),
+  days: z.array(z.object({ date: z.string(), payments: z.number() })),
+});
+
+export type ReceivedActivity = z.infer<typeof receivedActivitySchema>;
+
+export type ReceivedPayment = ReceivedActivity["recent"][number];
+
 export const createdRequestSchema = z.object({
   request: z.object({ id: z.string(), url: z.string() }),
 });

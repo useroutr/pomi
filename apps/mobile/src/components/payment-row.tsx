@@ -1,30 +1,18 @@
 import { StyleSheet, View } from "react-native";
-import { type ReceiverRequest } from "@/lib/api";
+import { type ReceivedPayment } from "@/lib/api";
 import { formatWhen } from "@/lib/format";
 import { usePalette } from "@/theme/theme";
 import { formatAmount, networkName } from "@pomi/shared";
 import { AssetMark } from "./asset-logo";
 import { PressableScale } from "./pressable-scale";
-import { requestTitle } from "./request-row";
 import { Text } from "./text";
 
-export interface ReceivedPayment {
-  request: ReceiverRequest;
-  amount: string;
-  creditedAt: string;
-}
-
-// Every payment across every request, newest first.
-export function receivedPayments(requests: ReceiverRequest[]): ReceivedPayment[] {
-  return requests
-    .flatMap((request) =>
-      request.payments.map((payment) => ({
-        request,
-        amount: payment.amount,
-        creditedAt: payment.creditedAt,
-      })),
-    )
-    .sort((a, b) => b.creditedAt.localeCompare(a.creditedAt));
+// What a payment paid: the pay box, or a request named by its note.
+export function paymentTitle(payment: ReceivedPayment): string {
+  if (payment.payBox) {
+    return "Pay box";
+  }
+  return payment.note ?? "Request";
 }
 
 export function PaymentRow({
@@ -39,20 +27,20 @@ export function PaymentRow({
   return (
     <PressableScale
       accessibilityRole="button"
-      accessibilityLabel={`Received ${amount} ${payment.request.assetSymbol} on ${networkName(payment.request.assetNetwork)} for ${requestTitle(payment.request)}`}
+      accessibilityLabel={`Received ${amount} ${payment.assetSymbol} on ${networkName(payment.assetNetwork)} for ${paymentTitle(payment)}`}
       onPress={onPress}
       pressedScale={0.985}
       style={styles.row}
     >
       <AssetMark
-        symbol={payment.request.assetSymbol}
-        network={payment.request.assetNetwork}
+        symbol={payment.assetSymbol}
+        network={payment.assetNetwork}
         size={42}
         ringColor={palette.surface}
       />
       <View style={styles.middle}>
         <Text variant="headline" numberOfLines={1}>
-          {requestTitle(payment.request)}
+          {paymentTitle(payment)}
         </Text>
         <Text variant="footnote" tone="secondary" numberOfLines={1}>
           Paid {formatWhen(payment.creditedAt)}
@@ -63,7 +51,7 @@ export function PaymentRow({
           +{amount}
         </Text>
         <Text variant="caption" tone="tertiary">
-          {payment.request.assetSymbol}
+          {payment.assetSymbol}
         </Text>
       </View>
     </PressableScale>
