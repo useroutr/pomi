@@ -1,8 +1,9 @@
-# Pomi's mobile design
+# Pomi's design
 
-How the receiver app looks and behaves, and why. The code is the source of truth for exact
-values: colors in `apps/mobile/src/theme/palette.ts`, type in `apps/mobile/src/theme/type.ts`,
-components in `apps/mobile/src/components`.
+How the receiver app and the website look and behave, and why. The code is the source of truth
+for exact values: colors in `apps/mobile/src/theme/palette.ts` and `apps/web/src/app/globals.css`,
+type in `apps/mobile/src/theme/type.ts`, components in `apps/mobile/src/components` and
+`apps/web/src/app/components`.
 
 ## Direction
 
@@ -87,22 +88,50 @@ cleared centre never covers an alignment pattern. Every colorway was decoded by 
 framework at card size and at the 84-point size on Home, with the longest request and handle
 links.
 
-## The web landing page
+## The website
 
-`apps/web/src/app/page.tsx`, styled in `landing/landing.module.css`, follows Uniswap's app
-page: a centred headline over the working object, here an ask card laid out like a swap card
-(what you ask for on top, what payers bring below, one button), with token, network and wallet
-logos floating around it at different depths, the far ones smaller, blurred and fainter. Its
-ground is the vibrant card's mesh of violet, pink and orange pools under SVG noise the browser
-draws, so the grain stays fine at any size; the closing card is the vibrant card itself. Below
-the hero: three steps on pastel cards, the networks payers can pay from, a page QR card drawn
-with the app's own code, and why Pomi can be trusted.
+The web app shares the app's look: its colors, grain, mesh and type are tokens in
+`apps/web/src/app/globals.css` (light and dark), and the pieces every screen uses (buttons,
+fields, cards, chips, token marks, the vibrant card, the brand backdrop, the header) are in
+`components/ui.module.css`. Bricolage Grotesque carries names, titles and amounts; the system
+font carries everything read at length. Each screen follows a Uniswap screen whose job it
+shares.
+
+**Landing page.** `apps/web/src/app/page.tsx`, styled in `landing/landing.module.css`, follows
+Uniswap's app page: a centred headline over the working object, here an ask card laid out like a
+swap card (what you ask for on top, what payers bring below, one button), with token, network
+and wallet logos floating around it at different depths, the far ones smaller, blurred and
+fainter. Its ground is the vibrant card's mesh of violet, pink and orange pools under SVG noise
+the browser draws, so the grain stays fine at any size; the closing card is the vibrant card
+itself. Below the hero: three steps on pastel cards, the networks payers can pay from, a page QR
+card drawn with the app's own code, and why Pomi can be trusted.
 
 The assets and networks come from Useroutr's catalog on each visit. When it cannot be read the
 card offers Stellar USDC and XLM and the network list is left out rather than guessed. Nothing
 on the card is created; its button leads to sign-in. Both color schemes follow the system,
 the floating logos hold still under reduced motion, and on phones only two show, at the edges
 beside the card.
+
+**Pay pages.** A request link (`/r/:id`) and a receiver's page (`/:handle`) follow Uniswap's
+Buy card: one card on the brand light, what it is for on top, the amount as its subject, the
+token on its network below, then one violet button. The card names who asks, shows their note
+as a message bubble (their words, never a link), and says where the money goes, with
+"Verified" only for an address the receiver signed for. A payer who chooses the amount types it
+into the amount itself. The checkout opens inside the same card, outside its form, so none of
+its buttons can submit the form again; a paid, closed or ended request ends the card with why.
+A receiver's page leads with their initial on the brand mesh and their name, then the pay box,
+then their listed requests as token rows.
+
+**Sign-in.** One card on the brand light with the app icon's face: an email, then a 6-digit
+code in large type. A first code also creates the account, and the card says so.
+
+**Dashboard.** Laid out as Uniswap lays out a portfolio. On top, the receiver's page on the
+vibrant card (link, copy, open and a QR code dialog) beside what reached them this month, one
+line per asset and network, added without floats (`sumAmounts` in `@pomi/shared`). Below,
+requests as token rows with their status, payments and actions, beside a new-request card
+shaped like a swap card's top box and the settings. Until an address exists, where to be paid
+takes the new-request card's place, since nothing can be asked for without it. On phones the
+order is: page, summary, new request, requests, settings.
 
 ## Pasting what was copied elsewhere
 
@@ -133,10 +162,10 @@ when something is refused.
 
 | Asset                                   | Source                                                                                                                                                                                  | License                                       |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| Token, network and wallet logos         | [web3icons](https://github.com/0xa3k5/web3icons), `@web3icons/core` 4.0.60, the "background" set, drawn with `react-native-svg` (as images on the web landing page). 4.0.60 added the Stellar wallets (LOBSTR, Varial, xBull, Albedo, Rabet), Soroswap, Aquarius and BLND. Only imported logos are bundled; other assets get a monogram. | MIT |
+| Token, network and wallet logos         | [web3icons](https://github.com/0xa3k5/web3icons), `@web3icons/core` 4.0.60, the "background" set, drawn with `react-native-svg` (as images on the web). 4.0.60 added the Stellar wallets (LOBSTR, Varial, xBull, Albedo, Rabet), Soroswap, Aquarius and BLND. Only imported logos are bundled; other assets get a monogram. | MIT |
 | Card grain                              | Rendered by `apps/mobile/scripts/render-textures.py` (seeded noise)                                                                                                                     | Pomi's own                                    |
 | 3D illustrations                        | [3dicons](https://github.com/realvjy/3dicons) by Vijay Verma, the "gradient" style, resized to 360 px in `apps/mobile/assets/illustrations`                                              | CC0 1.0                                       |
-| Display font                            | Bricolage Grotesque, `@expo-google-fonts/bricolage-grotesque`; on the web, `next/font/google`, loaded by the landing page only                                                          | SIL Open Font License 1.1                     |
+| Display font                            | Bricolage Grotesque, `@expo-google-fonts/bricolage-grotesque`; on the web, `next/font/google`, loaded once in the root layout                                                          | SIL Open Font License 1.1                     |
 | Interface icons                         | SF Symbols on iOS, Material Symbols on Android, through `expo-symbols`                                                                                                                  | Apple's and Google's terms for system symbols |
 | App icon, Android adaptive icon, splash | Rendered from the mark by `apps/mobile/scripts/render-icons.py`. iOS uses an Icon Composer bundle (`assets/pomi.icon`) so the system adds Liquid Glass and the dark and tinted looks.    | Pomi's own                                    |
 
