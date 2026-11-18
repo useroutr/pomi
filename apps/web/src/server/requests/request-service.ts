@@ -6,6 +6,7 @@ import { PayoutAddressRequiredError } from "../payout-addresses/payout-address-e
 import { activePayoutAddress } from "../payout-addresses/payout-address-repository";
 import { type PayoutAddressService } from "../payout-addresses/payout-address-service";
 import { ProfileNotFoundError } from "../profiles/profile-errors";
+import { type AssetDetails, assetDetailsOf, describeAsset } from "../useroutr/asset-details";
 import {
   type CatalogAsset,
   type PaymentNetwork,
@@ -307,10 +308,7 @@ export function createRequestService({
   // The symbol and network are shown wherever an amount is; Useroutr's list
   // is the source of truth for both, and is cached by the gateway.
   async function assetDetails(): Promise<AssetDetails> {
-    const assets = await useroutr.assets();
-    return new Map(
-      assets.map((asset) => [asset.id, { symbol: asset.symbol, network: asset.network }]),
-    );
+    return assetDetailsOf(await useroutr.assets());
   }
 
   function toPayerRequest(
@@ -353,18 +351,6 @@ export function createRequestService({
     setPayBox,
     closePayBox,
   };
-}
-
-type AssetDetails = Map<string, { symbol: string; network: string }>;
-
-// An asset Useroutr no longer lists is shown by its id. Every request made
-// before other networks existed is on Stellar, so that is the fallback.
-function describeAsset(
-  details: AssetDetails,
-  assetId: string,
-): { assetSymbol: string; assetNetwork: string } {
-  const asset = details.get(assetId);
-  return { assetSymbol: asset?.symbol ?? assetId, assetNetwork: asset?.network ?? "stellar" };
 }
 
 function parseNote(input: string | undefined): string | null {
