@@ -4,10 +4,15 @@ import Avalanche from "@web3icons/core/svgs/networks/background/avalanche.svg.js
 import Base from "@web3icons/core/svgs/networks/background/base.svg.js";
 import BinanceSmartChain from "@web3icons/core/svgs/networks/background/binance-smart-chain.svg.js";
 import Ethereum from "@web3icons/core/svgs/networks/background/ethereum.svg.js";
+import HyperEvm from "@web3icons/core/svgs/networks/background/hyper-evm.svg.js";
+import Lisk from "@web3icons/core/svgs/networks/background/lisk.svg.js";
+import Monad from "@web3icons/core/svgs/networks/background/monad.svg.js";
 import Optimism from "@web3icons/core/svgs/networks/background/optimism.svg.js";
 import Polygon from "@web3icons/core/svgs/networks/background/polygon.svg.js";
 import Solana from "@web3icons/core/svgs/networks/background/solana.svg.js";
+import Starknet from "@web3icons/core/svgs/networks/background/starknet.svg.js";
 import Stellar from "@web3icons/core/svgs/networks/background/stellar.svg.js";
+import Tron from "@web3icons/core/svgs/networks/background/tron.svg.js";
 
 export { networkList } from "@pomi/shared";
 
@@ -31,6 +36,11 @@ const LOGOS: Record<string, string> = {
   avalanche: Avalanche,
   bsc: BinanceSmartChain,
   solana: Solana,
+  starknet: Starknet,
+  monad: Monad,
+  hyperevm: HyperEvm,
+  tron: Tron,
+  lisk: Lisk,
 };
 
 export function networkInfo(network: string): NetworkInfo {

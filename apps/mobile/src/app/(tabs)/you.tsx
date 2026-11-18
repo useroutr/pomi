@@ -1,4 +1,4 @@
-import { formatAmount, networkName } from "@pomi/shared";
+import { formatAmount, networkName, wordList } from "@pomi/shared";
 import { router, useFocusEffect } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useState } from "react";
@@ -169,7 +169,7 @@ export default function YouScreen() {
                 key={network}
                 leading={<NetworkLogo network={network} size={30} />}
                 label={networkName(network)}
-                detail={symbols.join(" and ")}
+                detail={wordList(symbols, "and")}
                 value={
                   saved === undefined
                     ? undefined

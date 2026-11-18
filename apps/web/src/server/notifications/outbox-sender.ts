@@ -3,6 +3,7 @@ import { type StellarNetwork } from "../config";
 import { type Database } from "../database";
 import { type EmailDelivery, type EmailMessage } from "../email/email-delivery";
 import { type PushDelivery } from "../push/push-delivery";
+import { assetDetailsOf, describeAsset } from "../useroutr/asset-details";
 import { type UseroutrGateway } from "../useroutr/useroutr-gateway";
 import {
   claimUnsent,
@@ -89,10 +90,12 @@ export function createOutboxSender({
       throw new Error("a payment email needs its payment");
     }
     const payment = email.requestPayment;
+    const asset = await assetOf(payment.assetId);
     return paymentEmail({
       to: payment.request.user.email,
       amount: payment.amount.toString(),
-      assetSymbol: await assetSymbol(payment.assetId),
+      assetSymbol: asset.assetSymbol,
+      assetNetwork: asset.assetNetwork,
       note: payment.request.note,
       settlementTransactionHash: payment.settlementTransactionHash,
       appUrl,
@@ -107,7 +110,7 @@ export function createOutboxSender({
       try {
         const { requestPayment: payment } = await outboxPushContent(database, pushId);
         const devices = await devicesOf(database, payment.request.user.id);
-        const paid = `${payment.amount.toString()} ${await assetSymbol(payment.assetId)}`;
+        const paid = `${payment.amount.toString()} ${(await assetOf(payment.assetId)).assetSymbol}`;
         const outcomes = await pushDelivery.send(
           devices.map((device) => ({
             to: device.pushToken,
@@ -137,9 +140,8 @@ export function createOutboxSender({
     return { limit: BATCH_SIZE, now: now(), claimFor: CLAIM_MS };
   }
 
-  async function assetSymbol(assetId: string): Promise<string> {
-    const assets = await useroutr.assets();
-    return assets.find((asset) => asset.id === assetId)?.symbol ?? assetId;
+  async function assetOf(assetId: string) {
+    return describeAsset(assetDetailsOf(await useroutr.assets()), assetId);
   }
 
   return { sendPending };

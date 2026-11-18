@@ -5,6 +5,7 @@ const details = {
   to: "receiver@example.com",
   amount: "25",
   assetSymbol: "USDC",
+  assetNetwork: "stellar",
   note: "Logo design",
   settlementTransactionHash: "abc123",
   appUrl: "https://pomi.app",
@@ -17,9 +18,18 @@ describe("paymentEmail", () => {
 
     expect(email.to).toBe("receiver@example.com");
     expect(email.subject).toBe("You were paid 25 USDC");
-    expect(email.text).toContain('Your Pomi request for "Logo design" was paid.');
+    expect(email.text).toContain(
+      'Your Pomi request for "Logo design" was paid. 25 USDC is in your Stellar wallet.',
+    );
     expect(email.text).toContain("https://stellar.expert/explorer/public/tx/abc123");
     expect(email.text).toContain("https://pomi.app/dashboard");
+  });
+
+  it("names the wallet on the asset's network, and links no explorer off Stellar", () => {
+    const email = paymentEmail({ ...details, assetNetwork: "base" });
+
+    expect(email.text).toContain("25 USDC is in your Base wallet.");
+    expect(email.text).not.toContain("stellar.expert");
   });
 
   it("escapes the note in the HTML part", () => {

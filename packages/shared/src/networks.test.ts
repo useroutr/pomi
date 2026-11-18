@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { networkList, networkName, shortenAddress } from "./networks";
+import { networkList, networkName, wordList } from "./networks";
 
 describe("networkName", () => {
   it("names the networks Pomi knows, and any other after its id", () => {
     expect(networkName("bsc")).toBe("BNB Chain");
+    expect(networkName("hyperevm")).toBe("HyperEVM");
     expect(networkName("stellar")).toBe("Stellar");
     expect(networkName("zksync")).toBe("Zksync");
   });
@@ -20,13 +21,10 @@ describe("networkList", () => {
   });
 });
 
-describe("shortenAddress", () => {
-  it("shortens each network's address the way its wallets do", () => {
-    expect(
-      shortenAddress("stellar", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"),
-    ).toBe("GA5Z...KZVN");
-    expect(shortenAddress("base", "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed")).toBe(
-      "0x5aAe...eAed",
-    );
+describe("wordList", () => {
+  it("writes a list the way a sentence would", () => {
+    expect(wordList(["XLM"], "or")).toBe("XLM");
+    expect(wordList(["XLM", "USDC"], "or")).toBe("XLM or USDC");
+    expect(wordList(["XLM", "USDC", "EURC"], "and")).toBe("XLM, USDC and EURC");
   });
 });

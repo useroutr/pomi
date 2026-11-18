@@ -1,4 +1,8 @@
-import { InvalidEvmAddressError, InvalidStellarAccountError } from "@pomi/shared";
+import {
+  InvalidEvmAddressError,
+  InvalidStellarAccountError,
+  InvalidTronAddressError,
+} from "@pomi/shared";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { FakeStellar } from "@/test/fake-stellar";
 import { CATALOG_ASSETS, USDC_ISSUER } from "@/test/fake-useroutr";
@@ -107,6 +111,38 @@ describe("setting a payout address", () => {
 
     expect(saved).toMatchObject({ network: "base", address: BASE_ADDRESS });
     expect(stellar.reads).toBe(0);
+  });
+
+  it.each([
+    [
+      "solana",
+      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    ],
+    ["tron", "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"],
+    [
+      "starknet",
+      "0x49D36570D4E46F48E99674BD3FCC84644DDD6B96F7C741B1562B82F9E004DC7",
+      "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+    ],
+  ] as const)("saves a %s address the way its wallets write it", async (kind, input, address) => {
+    const saved = await service().setPayoutAddress("usr_1", input, {
+      network: kind,
+      addressKind: kind,
+    });
+
+    expect(saved).toMatchObject({ network: kind, address });
+    expect(stellar.reads).toBe(0);
+  });
+
+  it("refuses a Tron address whose checksum does not match", async () => {
+    await expect(
+      service().setPayoutAddress("usr_1", "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6u", {
+        network: "tron",
+        addressKind: "tron",
+      }),
+    ).rejects.toThrow(InvalidTronAddressError);
+    expect(await database.payoutAddress.count()).toBe(0);
   });
 
   it("refuses an EVM address whose checksum does not match", async () => {

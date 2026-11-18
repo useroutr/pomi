@@ -12,6 +12,9 @@ const database = createDatabase(databaseUrl);
 
 const STELLAR_ACCOUNT = `G${"A".repeat(55)}`;
 const EVM_ADDRESS = `0x${"a".repeat(40)}`;
+const SOLANA_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const TRON_ADDRESS = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+const STARKNET_ADDRESS = `0x${"0".repeat(2)}${"a".repeat(62)}`;
 
 function createUser(id: string, overrides: Partial<Prisma.UserUncheckedCreateInput> = {}) {
   return database.user.create({ data: { id, email: `${id}@example.com`, ...overrides } });
@@ -238,6 +241,29 @@ describe("receivers", () => {
         data: { id: "addr_3", userId: "usr_1", network: "Base", address: EVM_ADDRESS },
       }),
     ).rejects.toThrow("payout_addresses_network_id");
+  });
+
+  it.each([
+    ["solana", SOLANA_ADDRESS],
+    ["tron", TRON_ADDRESS],
+    ["starknet", STARKNET_ADDRESS],
+    ["monad", EVM_ADDRESS],
+  ])("takes a %s address written its own way", async (network, address) => {
+    await expect(
+      database.payoutAddress.create({ data: { id: "addr_1", userId: "usr_1", network, address } }),
+    ).resolves.toMatchObject({ network, address });
+  });
+
+  it.each([
+    ["solana", EVM_ADDRESS],
+    ["tron", SOLANA_ADDRESS],
+    ["starknet", EVM_ADDRESS],
+    ["starknet", STARKNET_ADDRESS.toUpperCase().replace("0X", "0x")],
+    ["monad", SOLANA_ADDRESS],
+  ])("refuses a %s address in another network's format", async (network, address) => {
+    await expect(
+      database.payoutAddress.create({ data: { id: "addr_1", userId: "usr_1", network, address } }),
+    ).rejects.toThrow("payout_addresses_address_format");
   });
 
   it("keeps one active payout address per receiver and network", async () => {

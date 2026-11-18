@@ -116,6 +116,45 @@ describe("createUseroutrGateway", () => {
     expect(calls).toHaveLength(1);
   });
 
+  it("knows how Solana, Tron and Starknet write addresses, and takes none on a network it does not know", async () => {
+    const asset = (id: string, network: string, contract: string) => ({
+      id,
+      object: "asset",
+      network,
+      symbol: "USDC",
+      decimals: 6,
+      contract,
+      destination: true,
+    });
+    const { gateway } = gatewayAnswering([
+      assetList(
+        asset("usdc_solana", "solana", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
+        asset("usdt_tron", "tron", "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"),
+        asset(
+          "usdc_starknet",
+          "starknet",
+          "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8",
+        ),
+        asset("usdc_monad", "monad", `0x${"1".repeat(40)}`),
+        asset(
+          "usdc_sui",
+          "sui",
+          "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7",
+        ),
+      ),
+    ]);
+
+    const assets = await gateway.assets();
+
+    expect(assets.map((listed) => [listed.network, listed.addressKind])).toEqual([
+      ["solana", "solana"],
+      ["tron", "tron"],
+      ["starknet", "starknet"],
+      ["monad", "evm"],
+      ["sui", null],
+    ]);
+  });
+
   it("groups every listed asset by the network a payer can pay from, from the same cached list", async () => {
     const { gateway, calls } = gatewayAnswering([
       assetList(

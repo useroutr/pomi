@@ -35,10 +35,6 @@ import {
   userByHandle,
 } from "./request-repository";
 
-// Phase 1 asks for these two (docs/spec.md, section 12.2), on every network
-// Useroutr pays receivers on. The ids and networks come from Useroutr's own
-// asset list, never from this file.
-const REQUESTABLE_SYMBOLS: ReadonlySet<string> = new Set(["USDC", "XLM"]);
 const NOTE_MAX_LENGTH = 280;
 
 export type RequestStatus = "OPEN" | "PAID" | "CLOSED";
@@ -139,10 +135,7 @@ export function createRequestService({
   // check an address on their network.
   async function requestableAssets(): Promise<CatalogAsset[]> {
     const assets = await useroutr.assets();
-    return assets.filter(
-      (asset) =>
-        asset.payout && asset.addressKind !== null && REQUESTABLE_SYMBOLS.has(asset.symbol),
-    );
+    return assets.filter((asset) => asset.payout && asset.addressKind !== null);
   }
 
   async function requestableAsset(assetId: string): Promise<CatalogAsset> {

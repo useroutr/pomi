@@ -1,5 +1,6 @@
 "use client";
 
+import { networkName } from "@pomi/shared";
 import { useRouter } from "next/navigation";
 import { type SubmitEvent, useState } from "react";
 import { z } from "zod";
@@ -15,10 +16,20 @@ const createdSchema = z.object({ request: z.object({ url: z.string() }) });
 // the finished amount.
 const AMOUNT_TYPING = /^\d{0,12}(\.\d{0,7})?$/;
 
-export function NewRequestForm({ assets }: { assets: RequestableAsset[] }) {
+export function NewRequestForm({
+  assets,
+  addressNetworks,
+}: {
+  assets: RequestableAsset[];
+  // Networks the receiver has an address on: a request pays that address.
+  addressNetworks: string[];
+}) {
   const router = useRouter();
   const [amount, setAmount] = useState("");
-  const [assetId, setAssetId] = useState(assets[0]?.id ?? "");
+  // Starts on an asset the receiver can already be paid in.
+  const [assetId, setAssetId] = useState(
+    (assets.find((asset) => addressNetworks.includes(asset.network)) ?? assets[0])?.id ?? "",
+  );
   const [note, setNote] = useState("");
   const [reusable, setReusable] = useState(false);
   const [listed, setListed] = useState(false);
@@ -26,6 +37,8 @@ export function NewRequestForm({ assets }: { assets: RequestableAsset[] }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
+  const network = assets.find((asset) => asset.id === assetId)?.network;
+  const needsAddress = network !== undefined && !addressNetworks.includes(network);
 
   async function create(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -145,12 +158,22 @@ export function NewRequestForm({ assets }: { assets: RequestableAsset[] }) {
           }}
         />
       </div>
+      {needsAddress && (
+        <p className={ui.notice}>
+          Add your {networkName(network)} address under Where you get paid first: a request on{" "}
+          {networkName(network)} pays it.
+        </p>
+      )}
       {error !== null && (
         <p className={ui.error} role="alert">
           {error}
         </p>
       )}
-      <button type="submit" className={[ui.primaryButton, ui.wide].join(" ")} disabled={pending}>
+      <button
+        type="submit"
+        className={[ui.primaryButton, ui.wide].join(" ")}
+        disabled={pending || needsAddress}
+      >
         {pending ? "Creating..." : "Create request"}
       </button>
       {createdUrl !== null && (

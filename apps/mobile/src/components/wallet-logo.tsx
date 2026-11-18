@@ -1,6 +1,9 @@
 import Coinbase from "@web3icons/core/svgs/wallets/background/coinbase.svg.js";
 import Lobstr from "@web3icons/core/svgs/wallets/background/lobstr.svg.js";
 import MetaMask from "@web3icons/core/svgs/wallets/background/metamask.svg.js";
+import Phantom from "@web3icons/core/svgs/wallets/background/phantom.svg.js";
+import Solflare from "@web3icons/core/svgs/wallets/background/solflare.svg.js";
+import Trust from "@web3icons/core/svgs/wallets/background/trust.svg.js";
 import Varial from "@web3icons/core/svgs/wallets/background/varial.svg.js";
 import { StyleSheet, View } from "react-native";
 import { SvgXml } from "react-native-svg";
@@ -13,6 +16,9 @@ const WALLETS = {
   varial: Varial,
   metamask: MetaMask,
   coinbase: Coinbase,
+  phantom: Phantom,
+  solflare: Solflare,
+  trust: Trust,
 } as const;
 
 export type WalletId = keyof typeof WALLETS;
