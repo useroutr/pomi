@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import ui from "@/app/components/ui.module.css";
 import { callApi } from "@/lib/api-client";
 
 export function CloseRequestButton({ requestId }: { requestId: string }) {
@@ -25,10 +26,19 @@ export function CloseRequestButton({ requestId }: { requestId: string }) {
 
   return (
     <>
-      <button type="button" className="secondary" disabled={pending} onClick={() => void close()}>
+      <button
+        type="button"
+        className={[ui.dangerButton, ui.compact].join(" ")}
+        disabled={pending}
+        onClick={() => void close()}
+      >
         Close
       </button>
-      {error !== null && <span className="error small">{error}</span>}
+      {error !== null && (
+        <span className={ui.error} role="alert">
+          {error}
+        </span>
+      )}
     </>
   );
 }

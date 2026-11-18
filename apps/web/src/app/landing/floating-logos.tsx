@@ -1,6 +1,6 @@
 import { type CSSProperties } from "react";
 import styles from "./landing.module.css";
-import { networkLogo, tokenLogo, walletLogo } from "./logos";
+import { networkLogo, tokenLogo, walletLogo } from "@/app/components/logos";
 
 // CSS custom properties the stylesheet reads for each logo.
 type FloaterStyle = CSSProperties & Record<`--${string}`, string>;

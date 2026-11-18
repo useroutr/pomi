@@ -1,8 +1,15 @@
-import { product } from "@pomi/shared";
+import { formatAmount, product } from "@pomi/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AppHeader } from "@/app/components/app-header";
+import { Avatar } from "@/app/components/avatar";
+import { ArrowIcon } from "@/app/components/icons";
 import { PayPanel } from "@/app/components/pay-panel";
+import pay from "@/app/components/pay.module.css";
+import { RequestDetails, TrustLine } from "@/app/components/request-summary";
+import { TokenMark } from "@/app/components/token-mark";
+import ui from "@/app/components/ui.module.css";
 import { requestService } from "@/server/app-services";
 import { serverConfig } from "@/server/config";
 import { ProfileNotFoundError } from "@/server/profiles/profile-errors";
@@ -31,56 +38,81 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function ReceiverPage({ params }: PageProps) {
   const page = await handlePage((await params).handle);
   const config = serverConfig();
+  const name = page.displayName ?? page.handle;
   return (
-    <main className="pay">
-      {config.stellar.network === "testnet" && (
-        <p className="testnet">Testnet: this page takes test money only.</p>
-      )}
-      <section className="card">
-        <h1 className="profile-name">{page.displayName ?? page.handle}</h1>
-        <p className="muted">@{page.handle}</p>
-      </section>
+    <>
+      <div className={ui.backdrop} aria-hidden="true" />
+      <AppHeader>
+        <Link href="/sign-in" className={[ui.secondaryButton, ui.compact].join(" ")}>
+          Get your own link
+        </Link>
+      </AppHeader>
+      <main className={pay.column}>
+        {config.stellar.network === "testnet" && (
+          <p className={ui.notice}>Testnet: this page takes test money only.</p>
+        )}
+        <header className={pay.profile}>
+          <Avatar name={name} size={88} />
+          <h1>{name}</h1>
+          <p>@{page.handle}</p>
+        </header>
 
-      {page.payBox !== null && (
-        <>
-          <h2 className="section-title">Pay {page.displayName ?? page.handle}</h2>
-          <PayPanel
-            request={page.payBox}
-            publicApiUrl={config.useroutr.publicApiUrl}
-            walletConnectProjectId={config.walletConnectProjectId}
-          />
-        </>
-      )}
+        {page.payBox !== null && (
+          <section className={pay.card} aria-label={`Pay ${name}`}>
+            <PayPanel
+              request={page.payBox}
+              label={page.payBox.amount === null ? `Pay ${name}` : `${name} asks for`}
+              publicApiUrl={config.useroutr.publicApiUrl}
+              walletConnectProjectId={config.walletConnectProjectId}
+            >
+              <RequestDetails request={page.payBox} />
+            </PayPanel>
+          </section>
+        )}
 
-      {page.listedRequests.length > 0 && (
-        <section className="card">
-          <h2>Requests</h2>
-          <ul className="requests">
-            {page.listedRequests.map((request) => (
-              <li key={request.id} className="request">
-                <div className="request-head">
-                  <strong>
-                    {request.amount} {request.assetSymbol}
-                  </strong>
-                  <Link className="button-link" href={`/r/${request.id}`}>
-                    Pay
+        {page.listedRequests.length > 0 && (
+          <section aria-labelledby="requests-title">
+            <h2 id="requests-title" className={pay.sectionTitle}>
+              Requests
+            </h2>
+            <ul className={pay.rows}>
+              {page.listedRequests.map((request) => (
+                <li key={request.id}>
+                  <Link className={pay.row} href={`/r/${request.id}`}>
+                    <TokenMark
+                      symbol={request.assetSymbol}
+                      network={request.assetNetwork}
+                      size={40}
+                    />
+                    <span className={pay.rowText}>
+                      <strong>
+                        {request.amount === null
+                          ? `Any amount of ${request.assetSymbol}`
+                          : `${formatAmount(request.amount)} ${request.assetSymbol}`}
+                      </strong>
+                      {request.note !== null && <span>{request.note}</span>}
+                    </span>
+                    <span className={pay.rowPay}>
+                      Pay
+                      <ArrowIcon />
+                    </span>
                   </Link>
-                </div>
-                {request.note !== null && <p className="note">{request.note}</p>}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
-      {page.payBox === null && page.listedRequests.length === 0 && (
-        <section className="card">
-          <p className="muted">Nothing to pay here yet.</p>
-        </section>
-      )}
-      <p className="muted small center">
-        {product.name} never holds your money. Payments are processed by Useroutr.
-      </p>
-    </main>
+        {page.payBox === null && page.listedRequests.length === 0 && (
+          <section className={pay.card}>
+            <div className={pay.state}>
+              <strong>Nothing to pay yet</strong>
+              <p>{name} has no open requests on this page right now.</p>
+            </div>
+          </section>
+        )}
+        <TrustLine />
+      </main>
+    </>
   );
 }

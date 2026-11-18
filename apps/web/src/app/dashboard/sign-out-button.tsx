@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import ui from "@/app/components/ui.module.css";
 
 export function SignOutButton() {
   const router = useRouter();
@@ -18,7 +19,12 @@ export function SignOutButton() {
   }
 
   return (
-    <button type="button" disabled={pending} onClick={() => void signOut()}>
+    <button
+      type="button"
+      className={[ui.ghostButton, ui.compact].join(" ")}
+      disabled={pending}
+      onClick={() => void signOut()}
+    >
       Sign out
     </button>
   );

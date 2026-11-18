@@ -1,0 +1,72 @@
+/* Signing in: one card on the brand light, an email and then a code. */
+
+.main {
+  display: grid;
+  place-items: center;
+  min-height: calc(100dvh - 64px);
+  padding: 32px 16px 64px;
+}
+
+.card {
+  display: grid;
+  gap: 20px;
+  width: min(100%, 420px);
+  padding: 32px 28px 28px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(20px);
+}
+
+.tile {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+}
+
+.tile svg {
+  width: 34px;
+  height: 34px;
+  color: #ffffff;
+}
+
+.heading h1 {
+  margin: 0 0 6px;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.heading p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.heading strong {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.form {
+  display: grid;
+  gap: 14px;
+}
+
+.codeInput {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.below {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}

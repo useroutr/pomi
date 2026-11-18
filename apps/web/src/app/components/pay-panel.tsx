@@ -1,5 +1,6 @@
 "use client";
 
+import { formatAmount } from "@pomi/shared";
 import { UseroutrCheckout } from "@useroutr/checkout-react";
 import {
   combineWalletConnectors,
@@ -7,11 +8,19 @@ import {
   createStellarWalletsKitConnector,
   createWalletConnectEvmConnector,
 } from "@useroutr/checkout-wallets";
-import { type SubmitEvent, useMemo, useState } from "react";
+import { type ReactNode, type SubmitEvent, useMemo, useState } from "react";
 import { z } from "zod";
 import { callApi } from "@/lib/api-client";
+import { CheckIcon } from "./icons";
+import pay from "./pay.module.css";
+import { AmountShown, AssetLine } from "./request-summary";
+import ui from "./ui.module.css";
 
 const checkoutSchema = z.object({ token: z.string().min(1) });
+
+// What can be typed as an amount while it is being typed; the server checks
+// the finished amount.
+const AMOUNT_TYPING = /^\d{0,12}(\.\d{0,7})?$/;
 
 export interface PayableRequest {
   id: string;
@@ -19,18 +28,25 @@ export interface PayableRequest {
   amount: string | null;
   minimumAmount: string | null;
   assetSymbol: string;
+  assetNetwork: string;
 }
 
 // The checkout is started only when the payer asks to pay, never when the
 // page loads, so a link preview or a crawler cannot create funding intents.
 export function PayPanel({
   request,
+  label,
   publicApiUrl,
   walletConnectProjectId,
+  children,
 }: {
   request: PayableRequest;
+  // Above the amount: who asks, or whom the payer pays.
+  label: string;
   publicApiUrl: string;
   walletConnectProjectId: string | null;
+  // What the payer reads between the amount and the button.
+  children?: ReactNode;
 }) {
   const [token, setToken] = useState<string | null>(null);
   const [chosenAmount, setChosenAmount] = useState("");
@@ -76,67 +92,110 @@ export function PayPanel({
     setToken(checkout.data.token);
   }
 
-  const shownAmount = payerChooses ? chosenAmount.trim() : request.amount;
+  const shownAmount = payerChooses ? chosenAmount.trim() : (request.amount ?? "");
   const payLabel =
-    shownAmount === null || shownAmount === ""
+    shownAmount === "" || shownAmount === "."
       ? `Pay in ${request.assetSymbol}`
-      : `Pay ${shownAmount} ${request.assetSymbol}`;
+      : `Pay ${formatAmount(shownAmount)} ${request.assetSymbol}`;
 
   if (paid) {
     return (
-      <section className="card">
-        <p>Payment received. Thank you.</p>
-      </section>
+      <div className={pay.state} role="status">
+        <span className={pay.stateIconDone}>
+          <CheckIcon />
+        </span>
+        <strong>Payment received</strong>
+        <p>
+          {formatAmount(shownAmount)} {request.assetSymbol}. Thank you.
+        </p>
+      </div>
     );
   }
 
-  if (token === null) {
-    return (
-      <form className="card stack" onSubmit={(event) => void start(event)}>
-        {payerChooses && (
-          <div className="field">
-            <label htmlFor={`amount-${request.id}`}>
-              Amount in {request.assetSymbol}
-              {request.minimumAmount !== null && ` (at least ${request.minimumAmount})`}
-            </label>
+  const amountPlaceholder = request.minimumAmount ?? "0";
+
+  // The same summary before and after the checkout opens; the checkout sits
+  // outside the form so none of its buttons can submit it again.
+  const summary = (
+    <>
+      {payerChooses ? (
+        <div className={pay.amountBox}>
+          <label className={pay.amountLabel} htmlFor={`amount-${request.id}`}>
+            {label}
+          </label>
+          <div className={pay.amountEntry}>
             <input
               id={`amount-${request.id}`}
-              className="text-input"
+              className={pay.amountInput}
+              style={{
+                width: `${String(Math.max(chosenAmount.length, amountPlaceholder.length, 1) + 0.3)}ch`,
+              }}
               inputMode="decimal"
               autoComplete="off"
-              placeholder={request.minimumAmount ?? "10"}
+              placeholder={amountPlaceholder}
               value={chosenAmount}
+              readOnly={token !== null}
               onChange={(event) => {
-                setChosenAmount(event.target.value);
+                const typed = event.target.value.replace(",", ".").replace(/[^0-9.]/g, "");
+                if (AMOUNT_TYPING.test(typed)) {
+                  setChosenAmount(typed);
+                }
               }}
               required
             />
+            <span className={pay.amountSymbol}>{request.assetSymbol}</span>
           </div>
-        )}
-        <button type="submit" className="pay-button" disabled={pending}>
-          {pending ? "Preparing your payment..." : payLabel}
-        </button>
-        <p className="muted small">
-          {pending
-            ? "This can take up to a minute while the payment is set up on Stellar."
-            : "Pay with any supported token, from a wallet or by hand."}
-        </p>
-        {error !== null && <p className="error">{error}</p>}
-      </form>
+          <p className={ui.hint}>
+            {request.minimumAmount === null
+              ? "You choose the amount"
+              : `At least ${formatAmount(request.minimumAmount)} ${request.assetSymbol}`}
+          </p>
+        </div>
+      ) : (
+        <AmountShown label={label} amount={shownAmount} assetSymbol={request.assetSymbol} />
+      )}
+      <AssetLine assetSymbol={request.assetSymbol} assetNetwork={request.assetNetwork} />
+      {children}
+    </>
+  );
+
+  if (token !== null) {
+    return (
+      <div className={pay.panel}>
+        {summary}
+        <div className={pay.checkout}>
+          <UseroutrCheckout
+            token={token}
+            baseUrl={publicApiUrl}
+            mode="inline"
+            wallets={wallets}
+            onSuccess={() => {
+              setPaid(true);
+            }}
+          />
+        </div>
+      </div>
     );
   }
 
   return (
-    <section className="checkout">
-      <UseroutrCheckout
-        token={token}
-        baseUrl={publicApiUrl}
-        mode="inline"
-        wallets={wallets}
-        onSuccess={() => {
-          setPaid(true);
-        }}
-      />
-    </section>
+    <form className={pay.panel} onSubmit={(event) => void start(event)}>
+      {summary}
+      <div className={pay.action}>
+        {error !== null && (
+          <p className={ui.error} role="alert">
+            {error}
+          </p>
+        )}
+        <button type="submit" className={[ui.primaryButton, ui.wide].join(" ")} disabled={pending}>
+          {pending ? "Preparing your payment..." : payLabel}
+        </button>
+        <p className={ui.hint}>
+          {pending
+            ? "This can take up to a minute while the payment is set up on Stellar."
+            : "Pay with any supported token, from a wallet or by hand."}
+        </p>
+      </div>
+    </form>
   );
 }

@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { type SubmitEvent, useState } from "react";
+import ui from "@/app/components/ui.module.css";
 import { callApi } from "@/lib/api-client";
+import styles from "./sign-in.module.css";
 
 type Step = { name: "email" } | { name: "code"; email: string };
 
@@ -43,60 +45,98 @@ export function SignInForm() {
 
   if (step.name === "email") {
     return (
-      <form className="form" onSubmit={(event) => void requestCode(event)}>
-        <label htmlFor="email">Email</label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(event) => {
-            setEmail(event.target.value);
-          }}
-          required
-          autoFocus
-        />
-        {error !== null && <p className="error">{error}</p>}
-        <button type="submit" disabled={pending}>
-          {pending ? "Sending..." : "Email me a code"}
-        </button>
-      </form>
+      <>
+        <div className={styles.heading}>
+          <h1>Sign in to Pomi</h1>
+          <p>We will email you a 6-digit code. There is no password to remember.</p>
+        </div>
+        <form className={styles.form} onSubmit={(event) => void requestCode(event)}>
+          <div className={ui.field}>
+            <label className={ui.label} htmlFor="email">
+              Email
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              className={ui.input}
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(event) => {
+                setEmail(event.target.value);
+              }}
+              required
+              autoFocus
+            />
+          </div>
+          {error !== null && (
+            <p className={ui.error} role="alert">
+              {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            className={[ui.primaryButton, ui.wide].join(" ")}
+            disabled={pending}
+          >
+            {pending ? "Sending..." : "Email me a code"}
+          </button>
+          <p className={styles.below}>New to Pomi? The same code creates your account.</p>
+        </form>
+      </>
     );
   }
 
   return (
-    <form className="form" onSubmit={(event) => void verifyCode(event, step.email)}>
-      <p className="muted">We sent a 6-digit code to {step.email}.</p>
-      <label htmlFor="code">Code</label>
-      <input
-        id="code"
-        name="code"
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        pattern="[0-9 ]*"
-        maxLength={7}
-        value={code}
-        onChange={(event) => {
-          setCode(event.target.value);
-        }}
-        required
-        autoFocus
-      />
-      {error !== null && <p className="error">{error}</p>}
-      <button type="submit" disabled={pending}>
-        {pending ? "Checking..." : "Sign in"}
-      </button>
-      <button
-        type="button"
-        className="link"
-        onClick={() => {
-          setError(null);
-          setStep({ name: "email" });
-        }}
-      >
-        Use another email
-      </button>
-    </form>
+    <>
+      <div className={styles.heading}>
+        <h1>Check your email</h1>
+        <p>
+          We sent a 6-digit code to <strong>{step.email}</strong>.
+        </p>
+      </div>
+      <form className={styles.form} onSubmit={(event) => void verifyCode(event, step.email)}>
+        <div className={ui.field}>
+          <label className={ui.visuallyHidden} htmlFor="code">
+            Code
+          </label>
+          <input
+            id="code"
+            name="code"
+            className={[ui.input, styles.codeInput].join(" ")}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9 ]*"
+            maxLength={7}
+            placeholder="000000"
+            value={code}
+            onChange={(event) => {
+              setCode(event.target.value);
+            }}
+            required
+            autoFocus
+          />
+        </div>
+        {error !== null && (
+          <p className={ui.error} role="alert">
+            {error}
+          </p>
+        )}
+        <button type="submit" className={[ui.primaryButton, ui.wide].join(" ")} disabled={pending}>
+          {pending ? "Checking..." : "Sign in"}
+        </button>
+        <button
+          type="button"
+          className={ui.ghostButton}
+          onClick={() => {
+            setError(null);
+            setStep({ name: "email" });
+          }}
+        >
+          Use another email
+        </button>
+      </form>
+    </>
   );
 }

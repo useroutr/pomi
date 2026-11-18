@@ -1,8 +1,20 @@
 import { product } from "@pomi/shared";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AppHeader } from "@/app/components/app-header";
 import { PayPanel } from "@/app/components/pay-panel";
-import { closedReason, RequestSummary } from "@/app/components/request-summary";
+import pay from "@/app/components/pay.module.css";
+import {
+  AmountShown,
+  AssetLine,
+  ClosedState,
+  closedReason,
+  ReceiverLine,
+  RequestDetails,
+  TrustLine,
+} from "@/app/components/request-summary";
+import ui from "@/app/components/ui.module.css";
 import { requestService } from "@/server/app-services";
 import { serverConfig } from "@/server/config";
 
@@ -27,27 +39,51 @@ export default async function PayPage({ params }: PageProps) {
     notFound();
   }
   const config = serverConfig();
-  const closed = closedReason(request);
+  const receiver = request.receiverName ?? request.receiverHandle ?? "Someone";
+  const label = request.amount === null ? `Pay ${receiver}` : `${receiver} asks for`;
   return (
-    <main className="pay">
-      {config.stellar.network === "testnet" && (
-        <p className="testnet">Testnet: this request takes test money only.</p>
-      )}
-      <RequestSummary request={request} />
-      {closed === null ? (
-        <PayPanel
-          request={request}
-          publicApiUrl={config.useroutr.publicApiUrl}
-          walletConnectProjectId={config.walletConnectProjectId}
-        />
-      ) : (
-        <section className="card">
-          <p>{closed}</p>
+    <>
+      <div className={ui.backdrop} aria-hidden="true" />
+      <AppHeader>
+        <Link href="/sign-in" className={[ui.secondaryButton, ui.compact].join(" ")}>
+          Get your own link
+        </Link>
+      </AppHeader>
+      <main className={pay.column}>
+        {config.stellar.network === "testnet" && (
+          <p className={ui.notice}>Testnet: this request takes test money only.</p>
+        )}
+        <section className={pay.card} aria-label={`Pay ${receiver}`}>
+          <ReceiverLine name={receiver} handle={request.receiverHandle} />
+          {closedReason(request) === null ? (
+            <PayPanel
+              request={request}
+              label={label}
+              publicApiUrl={config.useroutr.publicApiUrl}
+              walletConnectProjectId={config.walletConnectProjectId}
+            >
+              <RequestDetails request={request} />
+            </PayPanel>
+          ) : (
+            <div className={pay.panel}>
+              {request.amount !== null && (
+                <AmountShown
+                  label={label}
+                  amount={request.amount}
+                  assetSymbol={request.assetSymbol}
+                />
+              )}
+              <AssetLine
+                assetSymbol={request.assetSymbol}
+                assetNetwork={request.assetNetwork}
+                payable={false}
+              />
+              <ClosedState request={request} />
+            </div>
+          )}
         </section>
-      )}
-      <p className="muted small center">
-        {product.name} never holds your money. Payments are processed by Useroutr.
-      </p>
-    </main>
+        <TrustLine />
+      </main>
+    </>
   );
 }

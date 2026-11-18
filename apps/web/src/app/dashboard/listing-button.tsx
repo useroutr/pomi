@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import ui from "@/app/components/ui.module.css";
 import { callApi } from "@/lib/api-client";
 
 export function ListingButton({ requestId, listed }: { requestId: string; listed: boolean }) {
@@ -26,10 +27,19 @@ export function ListingButton({ requestId, listed }: { requestId: string; listed
 
   return (
     <>
-      <button type="button" className="secondary" disabled={pending} onClick={() => void toggle()}>
+      <button
+        type="button"
+        className={[ui.ghostButton, ui.compact].join(" ")}
+        disabled={pending}
+        onClick={() => void toggle()}
+      >
         {listed ? "Hide from my page" : "Show on my page"}
       </button>
-      {error !== null && <span className="error small">{error}</span>}
+      {error !== null && (
+        <span className={ui.error} role="alert">
+          {error}
+        </span>
+      )}
     </>
   );
 }
