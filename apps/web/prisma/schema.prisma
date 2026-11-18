@@ -88,8 +88,10 @@ model Session {
 
 // payout_addresses_one_active_per_user: a partial unique index on user_id.
 // payout_addresses_stellar_account: the address is a Stellar account (G...).
-// payout_addresses_address_format: a Stellar account (G...) on "stellar", an
-//   EVM address (0x...) elsewhere; payout_addresses_network_id.
+// payout_addresses_address_format: a Stellar account (G...) on "stellar", a
+//   base58 key on "solana", a T... address on "tron", a 64-digit 0x felt on
+//   "starknet", an EVM address (0x and 40 hex digits) elsewhere;
+//   payout_addresses_network_id.
 // payout_addresses_one_active_per_network: a partial unique index on
 //   (user_id, network) where active.
 model PayoutAddress {

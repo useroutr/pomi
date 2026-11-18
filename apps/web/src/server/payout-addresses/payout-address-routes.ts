@@ -1,5 +1,11 @@
 import "server-only";
-import { InvalidEvmAddressError, InvalidStellarAccountError } from "@pomi/shared";
+import {
+  InvalidEvmAddressError,
+  InvalidSolanaAddressError,
+  InvalidStarknetAddressError,
+  InvalidStellarAccountError,
+  InvalidTronAddressError,
+} from "@pomi/shared";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { type AuthService } from "../auth/auth-service";
@@ -96,7 +102,13 @@ export async function handleGetPayoutReadiness(request: NextRequest, services: R
 }
 
 export function payoutAddressErrorResponse(error: unknown) {
-  if (error instanceof InvalidStellarAccountError || error instanceof InvalidEvmAddressError) {
+  if (
+    error instanceof InvalidStellarAccountError ||
+    error instanceof InvalidEvmAddressError ||
+    error instanceof InvalidSolanaAddressError ||
+    error instanceof InvalidTronAddressError ||
+    error instanceof InvalidStarknetAddressError
+  ) {
     return errorResponse(400, "invalid_address", error.message);
   }
   if (error instanceof PayoutNetworkUnsupportedError) {

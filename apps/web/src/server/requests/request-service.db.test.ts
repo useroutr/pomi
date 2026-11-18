@@ -83,12 +83,14 @@ describe("creating a request", () => {
     expect(stored.payoutAddress.address).toBe(RECEIVER_ACCOUNT);
   });
 
-  it("offers USDC and XLM wherever Useroutr can pay a receiver in them, and nothing else", async () => {
+  it("offers every asset Useroutr can pay a receiver in, and none it cannot", async () => {
     const assets = await services().requests.requestableAssets();
 
+    // ETH on Base is one a payer may bring but a receiver cannot be paid in.
     expect(assets.map((asset) => [asset.symbol, asset.network])).toEqual([
       ["USDC", "stellar"],
       ["XLM", "stellar"],
+      ["EURC", "stellar"],
       ["USDC", "base"],
     ]);
   });
@@ -96,7 +98,7 @@ describe("creating a request", () => {
   it.each([
     ["an amount with eight decimals", { amount: "1.12345678" }, InvalidAmountError],
     ["a zero amount", { amount: "0" }, InvalidAmountError],
-    ["an asset Pomi does not offer", { assetId: "asset_eurc_stellar" }, UnsupportedAssetError],
+    ["an asset Useroutr cannot pay out", { assetId: "asset_eth_base" }, UnsupportedAssetError],
     ["an unknown asset", { assetId: "asset_doge" }, UnsupportedAssetError],
     ["a note over 280 characters", { note: "x".repeat(281) }, InvalidNoteError],
   ])("refuses %s", async (_case, override, errorType) => {

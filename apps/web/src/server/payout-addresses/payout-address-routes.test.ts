@@ -1,4 +1,4 @@
-import { InvalidEvmAddressError, InvalidStellarAccountError } from "@pomi/shared";
+import { type AddressKind, InvalidEvmAddressError, InvalidStellarAccountError } from "@pomi/shared";
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 import { CATALOG_ASSETS } from "@/test/fake-useroutr";
@@ -43,7 +43,7 @@ function recordingServices() {
         setPayoutAddress: (
           _userId: string,
           address: string,
-          target: { network: string; addressKind: "stellar" | "evm" },
+          target: { network: string; addressKind: AddressKind },
         ) => {
           targets.push(target);
           return Promise.resolve({ ...saved, network: target.network, address });

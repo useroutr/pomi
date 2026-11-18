@@ -1,5 +1,10 @@
 import "server-only";
-import { parseEvmAddress, parseStellarAccount, shortenStellarAccount } from "@pomi/shared";
+import {
+  type AddressKind,
+  parseAddress,
+  parseStellarAccount,
+  shortenStellarAccount,
+} from "@pomi/shared";
 import { type StellarNetwork } from "../config";
 import { type Database } from "../database";
 import { newId } from "../ids";
@@ -61,17 +66,18 @@ export function createPayoutAddressService({
   // A Stellar account must exist and take payments without a memo: Useroutr
   // refuses either itself, but only when a payer opens the link, and checking
   // here spares the receiver a broken request. Whether it trusts an asset is
-  // checked when a request for that asset is created. An EVM address is
-  // checked for its form and checksum; there is no account to read.
+  // checked when a request for that asset is created. Any other address is
+  // checked for its form and, where its network writes one, its checksum
+  // (EVM in mixed case, Tron); there is no account to read.
   async function setPayoutAddress(
     userId: string,
     input: string,
-    target: { network: string; addressKind: "stellar" | "evm" },
+    target: { network: string; addressKind: AddressKind },
   ): Promise<PayoutAddress> {
     const address =
       target.addressKind === "stellar"
         ? await checkedStellarAccount(input)
-        : parseEvmAddress(input);
+        : parseAddress(target.addressKind, input);
     const saved = await database.$transaction(async (transaction) => {
       await lockPayoutAddresses(transaction, userId);
       const current = await activePayoutAddress(transaction, userId, target.network);

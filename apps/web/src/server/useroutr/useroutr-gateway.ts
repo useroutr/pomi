@@ -1,4 +1,5 @@
 import "server-only";
+import { type AddressKind, ownAddressKind } from "@pomi/shared";
 import {
   constructWebhookEvent,
   type FundingIntentStatus,
@@ -20,7 +21,7 @@ export interface CatalogAsset {
   payout: boolean;
   // How an address on this asset's network is written, to check the
   // receiver's; null for a kind Pomi cannot check yet.
-  addressKind: "stellar" | "evm" | null;
+  addressKind: AddressKind | null;
   // A Stellar asset's identity, for trustline checks; null elsewhere.
   stellar: { code: string; issuer: string | null } | null;
 }
@@ -132,7 +133,11 @@ export function createUseroutrGateway(options: UseroutrGatewayOptions): Useroutr
       // Read as Useroutr lists it, so a network it starts paying out to needs
       // no change here.
       payout: "destination" in asset && asset.destination === true,
-      addressKind: EVM_CONTRACT.test(asset.contract) ? "evm" : null,
+      // A network Pomi knows to write addresses its own way, or else an EVM
+      // chain when its tokens are EVM contracts. Any other network takes no
+      // address until Pomi learns how it writes one.
+      addressKind:
+        ownAddressKind(asset.network) ?? (EVM_CONTRACT.test(asset.contract) ? "evm" : null),
       stellar: null,
     };
   }
