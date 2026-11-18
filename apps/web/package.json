@@ -23,6 +23,7 @@
     "@useroutr/checkout-react": "0.2.0",
     "@useroutr/checkout-wallets": "0.2.0",
     "@useroutr/sdk": "0.2.0",
+    "@web3icons/core": "4.0.60",
     "next": "16.4.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
