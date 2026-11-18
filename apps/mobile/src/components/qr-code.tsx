@@ -1,7 +1,7 @@
+import { drawQrCode, roundedSquare } from "@pomi/shared";
 import { useMemo } from "react";
 import { View } from "react-native";
 import Svg, { Path } from "react-native-svg";
-import { drawQrCode, roundedSquare } from "@/lib/qr-paths";
 import { PomiMark } from "./logo";
 
 // A QR code drawn the way Pomi's cards show it: rounded modules, soft finder

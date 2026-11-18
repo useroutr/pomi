@@ -6,8 +6,10 @@ export {
   shortenEvmAddress,
 } from "./evm-address";
 export { InvalidHandleError, parseHandle } from "./handle";
+export { POMI_MARK } from "./mark";
 export { networkList, networkName, shortenAddress } from "./networks";
 export { product } from "./product";
+export { drawQrCode, type QrPaths, roundedSquare } from "./qr-paths";
 export { findSignInCode, SIGN_IN_CODE_LENGTH } from "./sign-in-code";
 export {
   findStellarAccount,

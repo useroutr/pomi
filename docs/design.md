@@ -29,12 +29,12 @@ profile header over settings rows with colored icon tiles. Four things carry the
   cards. At night the ground turns near-black (`#0E0C14`) and the action a lighter violet.
   Every text color meets 4.5:1 on what it sits on.
 - **The mark.** A bold lowercase p whose bowl is a coin (a ring around a dot), its stem cut
-  from the bowl by a gap that follows the ring (`PomiMark` in `components/logo.tsx`). Like
-  Linktree's asterisk with its detached trunk, it is one flat color, a familiar glyph with one
-  deliberate break, and it reads at favicon size. The app icon is the white mark on the brand
-  violet with its coin in coral; the welcome screen sets it beside "pomi" in Bricolage
-  Grotesque Bold; it sits in the centre of every QR code. The orb survives only as the avatar
-  behind a receiver's initial.
+  from the bowl by a gap that follows the ring (`POMI_MARK` in `packages/shared/src/mark.ts`,
+  drawn by `PomiMark` in the app). Like Linktree's asterisk with its detached trunk, it is one
+  flat color, a familiar glyph with one deliberate break, and it reads at favicon size. The
+  app icon is the white mark on the brand violet with its coin in coral; the welcome screen
+  sets it beside "pomi" in Bricolage Grotesque Bold; it sits in the centre of every QR code.
+  The orb survives only as the avatar behind a receiver's initial.
 - **3D illustrations** in the same violet, pink and orange carry warmth where a screen would
   otherwise be empty: the first request, the code email, the wallet step, notifications and
   the paid moment.
@@ -78,12 +78,13 @@ step leaves a notice on Home, and asking for money then leads back to it.
 
 Drawn the way Linktree draws its QR cards: rounded modules, soft finder eyes and the mark in a
 cleared centre, all in one ink, straight onto a card of one light color with the receiver's
-initial above and the link below (`QrCode`, `ShareCard`). The page QR screen offers four cards
-(lavender, peach, blush, paper; `QR_COLORWAYS`), each ink at least 9.8:1 on its card. Codes
-stay dark on light, never inverted, because some wallets' scanners cannot read a light code on
-a dark ground. Error correction is H and Pomi's links fit in version 6, so the cleared centre
-never covers an alignment pattern. Every colorway was decoded by Apple's Vision framework at
-card size and at the 84-point size on Home, with the longest request and handle links.
+initial above and the link below (`QrCode`, `ShareCard`; the modules come from `drawQrCode` in
+`packages/shared/src/qr-paths.ts`). The page QR screen offers four cards (lavender, peach,
+blush, paper; `QR_COLORWAYS`), each ink at least 9.8:1 on its card. Codes stay dark on light,
+never inverted, because some wallets' scanners cannot read a light code on a dark ground. Error
+correction is H and Pomi's links fit in version 6, so the cleared centre never covers an
+alignment pattern. Every colorway was decoded by Apple's Vision framework at card size and at
+the 84-point size on Home, with the longest request and handle links.
 
 ## Pasting what was copied elsewhere
 

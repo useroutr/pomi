@@ -1,6 +1,6 @@
 """Renders Pomi's mark into every app icon and splash asset the Expo app needs.
 
-The mark is the one in the app (MARK in src/components/logo.tsx), on a
+The mark is the one in the app (POMI_MARK in packages/shared/src/mark.ts), on a
 100-unit square: a ring centred at (50, 37), 32 out and 15 in; a dot of 7 at
 the same centre; and a stem from x 18 to 35 down to y 95, its top cut by a
 circle of 37 around the ring's centre so a gap follows the ring. The icon is
