@@ -1,13 +1,19 @@
+import Monad from "@web3icons/core/svgs/networks/background/monad.svg.js";
 import AQUA from "@web3icons/core/svgs/tokens/background/AQUA.svg.js";
 import ARB from "@web3icons/core/svgs/tokens/background/ARB.svg.js";
+import AVAX from "@web3icons/core/svgs/tokens/background/AVAX.svg.js";
 import BLND from "@web3icons/core/svgs/tokens/background/BLND.svg.js";
+import BNB from "@web3icons/core/svgs/tokens/background/BNB.svg.js";
 import CBBTC from "@web3icons/core/svgs/tokens/background/CBBTC.svg.js";
 import DAI from "@web3icons/core/svgs/tokens/background/DAI.svg.js";
 import ETH from "@web3icons/core/svgs/tokens/background/ETH.svg.js";
 import EURC from "@web3icons/core/svgs/tokens/background/EURC.svg.js";
 import LINK from "@web3icons/core/svgs/tokens/background/LINK.svg.js";
+import POL from "@web3icons/core/svgs/tokens/background/POL.svg.js";
 import PYUSD from "@web3icons/core/svgs/tokens/background/PYUSD.svg.js";
 import SOL from "@web3icons/core/svgs/tokens/background/SOL.svg.js";
+import STRK from "@web3icons/core/svgs/tokens/background/STRK.svg.js";
+import TRX from "@web3icons/core/svgs/tokens/background/TRX.svg.js";
 import USDC from "@web3icons/core/svgs/tokens/background/USDC.svg.js";
 import USDT from "@web3icons/core/svgs/tokens/background/USDT.svg.js";
 import XLM from "@web3icons/core/svgs/tokens/background/XLM.svg.js";
@@ -31,6 +37,13 @@ const LOGOS: Record<string, string> = {
   LINK,
   ARB,
   SOL,
+  BNB,
+  AVAX,
+  POL,
+  STRK,
+  TRX,
+  // Monad's coin wears the network's own mark.
+  MON: Monad,
   // Stellar's own, for networks and tokens Useroutr lists there.
   AQUA,
   BLND,
@@ -39,7 +52,7 @@ const LOGOS: Record<string, string> = {
 
 // Wrapped and bridged forms carry the mark of the asset they stand for, as
 // wallets show them.
-const SAME_MARK_AS: Record<string, string> = { WETH: "ETH", USDT0: "USDT" };
+const SAME_MARK_AS: Record<string, string> = { WETH: "ETH", WMON: "MON", USDT0: "USDT" };
 
 export function AssetLogo({ symbol, size = 40 }: { symbol: string; size?: number }) {
   const upper = symbol.toUpperCase();
