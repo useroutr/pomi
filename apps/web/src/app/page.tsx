@@ -11,6 +11,7 @@ import styles from "./landing/landing.module.css";
 import { networkLogo, tokenLogo, walletLogo } from "./landing/logos";
 import { PomiLogo, PomiMark } from "./landing/pomi-logo";
 import { QrCard } from "./landing/qr-card";
+import { usdcFirst } from "./landing/usdc-first";
 
 // Loaded here, not in the layout, so only the landing page downloads it.
 const display = Bricolage_Grotesque({
@@ -57,7 +58,7 @@ export default async function HomePage() {
   await connection();
   const { assets, payWith } = await catalog();
   const appUrl = serverConfig().appUrl;
-  const options: AskOption[] = assets.map((asset) => ({
+  const options: AskOption[] = usdcFirst(assets).map((asset) => ({
     symbol: asset.symbol,
     network: asset.network,
     tokenLogo: tokenLogo(asset.symbol),
