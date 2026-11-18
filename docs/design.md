@@ -202,9 +202,13 @@ has no entry for still shows, under its id and a monogram.
 Also Useroutr's call: an asset it marks `destination: true` can be asked for, on its own
 network. You lists one row per such network, with its logo, the tokens a request there pays in,
 and the saved address or "Add". The payout screen takes the network: Stellar addresses get the
-account checks, EVM addresses the checksum, and an address pasted in one case gets a warning
-that no typo can be caught in it. Opened without a network (onboarding, or Home's notice before
-any address exists), it lets the receiver pick one.
+account checks, EVM and Tron addresses their checksum, and an address that carries none (an EVM
+address in one case, any Solana address, a Starknet address) gets a warning that no typo can be
+caught in it. Each kind of network suggests its own free wallets (LOBSTR and Varial; MetaMask
+and Coinbase Wallet; Phantom and Solflare; TronLink and Trust Wallet; Starknet's own list).
+Opened without a network (onboarding, or Home's notice before any address exists), it lets the
+receiver pick one. The web dashboard's "Where you get paid" lists the same networks, one row
+each, and a request or pay box on a network with no address yet says to add one first.
 
 Wherever an asset shows, its logo carries the network's in its corner (`AssetMark`), as wallets
 draw tokens. Ask's asset pills add the network's name under the symbol once the assets on offer
@@ -218,5 +222,7 @@ settlement hash of a payout on another network belongs to, so it links none.
 Every link goes somewhere real and was checked to load: LOBSTR (lobstr.co) and Varial
 (varialwallet.com, the wallet formerly called Freighter) for a first Stellar wallet, and
 Stellar's own wallet list; MetaMask (metamask.com) and Coinbase Wallet (base.app, its own
-site) for a first EVM wallet, and ethereum.org's wallet finder; Stellar Expert for a Stellar
-payment's transaction.
+site) for a first EVM wallet, and ethereum.org's wallet finder; Phantom (phantom.com) and
+Solflare (solflare.com) for Solana; TronLink (tronlink.org) and Trust Wallet (trustwallet.com)
+for Tron; starknet.io's wallet list for Starknet; Stellar Expert for a Stellar payment's
+transaction. Solana's own wallet page is left out: it did not load when checked.

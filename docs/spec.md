@@ -45,8 +45,9 @@ people use it, and it shows the protocol working. This app plays the same part f
 4. Sets up the pay box on their page: an asset, and either a fixed amount or the payer's choice,
    with an optional minimum.
 5. Creates requests:
-   - a fixed amount and asset: XLM or USDC on Stellar, or USDC on another network Useroutr
-     delivers it to. Payers still pay from any network.
+   - a fixed amount and asset: any asset Useroutr can pay a receiver in, on its own network
+     (XLM or USDC on Stellar, USDC on Base, and whatever Useroutr adds). Payers still pay from
+     any network.
    - a note
    - single-use (an invoice) or reusable (the same amount, paid any number of times)
    - listed on their page, or unlisted and reachable only by its link (the default for invoices)
@@ -176,9 +177,16 @@ Paying by hand works everywhere, so any payer can always pay.
   changed in phase 1, so links already shared keep working.
 - **Payout networks come from Useroutr.** `GET /v1/assets` marks each asset `destination: true`
   when a funding intent can pay a receiver in it: every Stellar asset, and an asset on another
-  network when one of Useroutr's cross-chain rails delivers it there. Pomi offers USDC and XLM
-  wherever they are marked, so a network Useroutr starts paying out on needs no change in Pomi.
-  A request pays out in its asset on that asset's own network.
+  network when one of Useroutr's cross-chain rails delivers it there. Pomi offers every asset so
+  marked on a network whose addresses it can check, so a network or asset Useroutr starts paying
+  out needs no change in Pomi. A request pays out in its asset on that asset's own network.
+- **How a network writes addresses.** Useroutr's asset list does not say, so Pomi knows the
+  networks that write them their own way, by Useroutr's network id: `stellar`, `solana`, `tron`
+  and `starknet` (`ownAddressKind` in `packages/shared`). Any other network whose tokens are EVM
+  contracts is an EVM chain (Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche, BNB Chain,
+  Monad, HyperEVM, Lisk). A network that is neither takes no address, so its assets are not
+  offered until Pomi learns how it writes one. If Useroutr names Solana, Tron or Starknet by
+  other ids, or adds a field saying how a network writes addresses, this table follows it.
 - **One payout address per network.** A receiver has at most one active address on each
   network, and saving a new one on Stellar leaves their Base address as it was. The database
   enforces both, and that each address is written the way its network writes accounts.
@@ -188,6 +196,11 @@ Paying by hand works everywhere, so any payer can always pay.
   case carries no checksum, so the app says it cannot catch a typo in it and asks the receiver
   to compare it with their wallet. Nothing is read from the network: an EVM address needs no
   account to exist and no trustline.
+- **Solana, Tron and Starknet addresses** are checked the same way, for how each network writes
+  them, and nothing is read from the network. A Tron address (`T` and 33 base58 characters)
+  carries a checksum that must match. A Solana address (a 32-byte key in base58) carries none,
+  and Pomi does not check Starknet's own (`0x` and up to 64 hex digits, below 2^251, stored
+  padded to 64 in lowercase); for both the app says a typo cannot be caught.
 - **A Stellar payout address** is connected or pasted. The address's checksum is checked first,
   which catches typos (`parseStellarAccount` in `packages/shared`). Then the backend reads the
   account from Horizon:
@@ -223,7 +236,7 @@ transaction.
 | Table | Key fields | Constraints |
 |---|---|---|
 | `users` | id, email, handle, display_name | email unique; handle unique, and its format checked |
-| `payout_addresses` | user_id, network, address, active, verified_at | one active address per user and network; `network` is a lowercase Useroutr network id; a `stellar` address is a Stellar account (`G…`), any other network's is an EVM address (`0x` and 40 hex digits) |
+| `payout_addresses` | user_id, network, address, active, verified_at | one active address per user and network; `network` is a lowercase Useroutr network id; a `stellar` address is a Stellar account (`G…`), a `solana` one a base58 key, a `tron` one `T` and 33 base58 characters, a `starknet` one `0x` and 64 lowercase hex digits, any other network's an EVM address (`0x` and 40 hex digits) |
 | `requests` | id, user_id, payout_address_id, kind (`single` / `reusable`), amount_kind (`fixed` / `open`), amount, minimum_amount, asset_id, note, listed, pay_box, status (`open` / `paid` / `closed`), ends_at | a fixed request has an amount and no minimum, an open one has no amount; amounts are positive; a single-use request is fixed; the pay box is reusable and one per user; a note is at most 280 characters |
 | `request_intents` | request_id, funding_intent_id, funding_token, visit_id, visitor_id, client_key, amount, exclusive, state (`open` / `closed`), expires_at | `funding_intent_id` unique; one per request and visit; an exclusive intent has no visit and any other has one; one open intent per single-use request (`exclusive`), by a partial unique index. `client_key` is an HMAC of the client's address, never the address. |
 | `request_payments` | request_id, funding_intent_id, amount, asset_id, payment_transaction_hash, settlement_transaction_hash, credited_at | `funding_intent_id` unique, so one credit counts once |
