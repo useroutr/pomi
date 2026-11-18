@@ -393,7 +393,7 @@ The app has two environments, each tied to one Useroutr environment. They share 
 
 Production runs on Vercel from `main`, with Neon's Postgres. `apps/web/vercel.json` holds the
 build (Turborepo, so the Prisma client is generated first), applies migrations on production
-builds only, and runs the email job every five minutes as a backstop to the send that follows
+builds only, over Neon's direct connection since the pooler cannot hold Prisma's migration lock, and runs the email job every five minutes as a backstop to the send that follows
 each webhook. It runs in the Threadflow team, on Vercel Pro, beside Useroutr's own site.
 
 Things to know about testnet:
