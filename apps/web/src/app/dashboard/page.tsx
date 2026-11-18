@@ -17,7 +17,7 @@ import { NewRequestForm } from "./new-request-form";
 import { PageCard } from "./page-card";
 import { PayBoxForm } from "./pay-box-form";
 import { PaymentLog } from "./payment-log";
-import { PayoutAddressForm } from "./payout-address-form";
+import { PayoutAddresses } from "./payout-addresses";
 import { DisplayNameForm } from "./profile-form";
 import { ReceivedOverview } from "./received-overview";
 import { RequestList } from "./request-list";
@@ -35,12 +35,14 @@ export default async function DashboardPage() {
     redirect("/sign-in");
   }
   const config = serverConfig();
-  const [payoutAddress, profile, catalog] = await Promise.all([
-    payoutAddressService().payoutAddress(user.id),
+  const [saved, profile, catalog] = await Promise.all([
+    payoutAddressService().payoutAddresses(user.id),
     profileService().profile(user.id),
     useroutrCatalog(user.id),
   ]);
-  const needsAddress = "Add the address you want to be paid at first.";
+  const addresses = saved.map(({ network, address }) => ({ network, address }));
+  const payoutNetworks = networksPaidOutOn(catalog?.assets ?? [], addresses);
+  const where = <PayoutAddresses networks={payoutNetworks} saved={addresses} />;
 
   return (
     <>
@@ -75,15 +77,18 @@ export default async function DashboardPage() {
         <div className={styles.columns}>
           {/* A receiver without an address can ask for nothing, so where to be
               paid takes the place of the request form until there is one. */}
-          {payoutAddress === null ? (
+          {addresses.length === 0 ? (
             <section className={[ui.card, styles.create].join(" ")} aria-labelledby="payout-title">
               <div>
                 <h2 id="payout-title" className={ui.cardTitle}>
                   Where you get paid
                 </h2>
-                <p className={ui.hint}>Add it first; then you can ask for money.</p>
+                <p className={ui.hint}>
+                  Add the address of a wallet you own on any of these networks; then you can ask for
+                  money there.
+                </p>
               </div>
-              <PayoutAddressForm current={null} />
+              {where}
             </section>
           ) : (
             <section className={[ui.card, styles.create].join(" ")} aria-labelledby="new-title">
@@ -93,7 +98,10 @@ export default async function DashboardPage() {
               {catalog === null ? (
                 <p className={styles.unavailable}>{UNAVAILABLE}</p>
               ) : (
-                <NewRequestForm assets={catalog.assets} />
+                <NewRequestForm
+                  assets={catalog.assets}
+                  addressNetworks={addresses.map((saved) => saved.network)}
+                />
               )}
             </section>
           )}
@@ -156,23 +164,24 @@ export default async function DashboardPage() {
               </div>
               {catalog === null ? (
                 <p className={styles.unavailable}>{UNAVAILABLE}</p>
-              ) : payoutAddress === null ? (
-                <p className={styles.unavailable}>{needsAddress}</p>
+              ) : addresses.length === 0 ? (
+                <p className={styles.unavailable}>Add the address you want to be paid at first.</p>
               ) : (
-                <PayBoxForm
-                  payBox={catalog.payBox}
-                  assets={catalog.assets}
-                  currentPayoutAddress={payoutAddress.address}
-                />
+                <PayBoxForm payBox={catalog.payBox} assets={catalog.assets} addresses={addresses} />
               )}
             </section>
 
-            {payoutAddress !== null && (
+            {addresses.length > 0 && (
               <section className={ui.card} aria-labelledby="payout-title">
-                <h2 id="payout-title" className={ui.cardTitle}>
-                  Where you get paid
-                </h2>
-                <PayoutAddressForm current={payoutAddress.address} />
+                <div>
+                  <h2 id="payout-title" className={ui.cardTitle}>
+                    Where you get paid
+                  </h2>
+                  <p className={ui.hint}>
+                    One address per network. Requests on a network pay its address.
+                  </p>
+                </div>
+                {where}
               </section>
             )}
 
@@ -187,6 +196,17 @@ export default async function DashboardPage() {
       </main>
     </>
   );
+}
+
+// Every network a request can be paid on, Stellar first, then as Useroutr
+// lists them; a network with a saved address that Useroutr no longer pays out
+// on stays, so its address can still be seen.
+function networksPaidOutOn(assets: { network: string }[], saved: { network: string }[]): string[] {
+  const networks = new Set(["stellar", ...assets.map((asset) => asset.network)]);
+  for (const address of saved) {
+    networks.add(address.network);
+  }
+  return [...networks];
 }
 
 // Asset symbols come from Useroutr, so both lists need it. When it cannot be

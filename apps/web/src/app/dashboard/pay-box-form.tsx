@@ -1,6 +1,6 @@
 "use client";
 
-import { formatAmount, shortenAddress } from "@pomi/shared";
+import { formatAmount, networkName, shortenAddress } from "@pomi/shared";
 import { useRouter } from "next/navigation";
 import { type SubmitEvent, useState } from "react";
 import ui from "@/app/components/ui.module.css";
@@ -29,19 +29,33 @@ function describe(payBox: DashboardPayBox): string {
 export function PayBoxForm({
   payBox,
   assets,
-  currentPayoutAddress,
+  addresses,
 }: {
   payBox: DashboardPayBox | null;
   assets: RequestableAsset[];
-  currentPayoutAddress: string;
+  // The receiver's address on each network: the pay box pays the one on its
+  // asset's network.
+  addresses: { network: string; address: string }[];
 }) {
   const router = useRouter();
-  const [assetId, setAssetId] = useState(payBox?.assetId ?? assets[0]?.id ?? "");
+  // A new pay box starts on an asset the receiver can already be paid in.
+  const [assetId, setAssetId] = useState(
+    payBox?.assetId ??
+      (
+        assets.find((asset) => addresses.some((saved) => saved.network === asset.network)) ??
+        assets[0]
+      )?.id ??
+      "",
+  );
   const [payerChooses, setPayerChooses] = useState((payBox?.amount ?? null) === null);
   const [amount, setAmount] = useState(payBox?.amount ?? "");
   const [minimumAmount, setMinimumAmount] = useState(payBox?.minimumAmount ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const addressOn = (network: string) =>
+    addresses.find((saved) => saved.network === network)?.address;
+  const network = assets.find((asset) => asset.id === assetId)?.network;
+  const needsAddress = network !== undefined && addressOn(network) === undefined;
 
   async function save(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -78,7 +92,8 @@ export function PayBoxForm({
             {payBox.open ? "On your page" : "Off"}
           </span>
           {describe(payBox)}
-          {payBox.payoutAddress !== currentPayoutAddress &&
+          {addressOn(payBox.assetNetwork) !== undefined &&
+            payBox.payoutAddress !== addressOn(payBox.assetNetwork) &&
             " Save it again to use your new address."}
         </p>
       )}
@@ -133,13 +148,19 @@ export function PayBoxForm({
           <AssetSelect id="pay-box-asset" assets={assets} value={assetId} onChange={setAssetId} />
         </div>
       </div>
+      {needsAddress && (
+        <p className={ui.notice}>
+          Add your {networkName(network)} address under Where you get paid first: the pay box pays
+          it.
+        </p>
+      )}
       {error !== null && (
         <p className={ui.error} role="alert">
           {error}
         </p>
       )}
       <div className={styles.buttons}>
-        <button type="submit" className={ui.primaryButton} disabled={pending}>
+        <button type="submit" className={ui.primaryButton} disabled={pending || needsAddress}>
           {payBox?.open === true ? "Save pay box" : "Turn on pay box"}
         </button>
         {payBox?.open === true && (

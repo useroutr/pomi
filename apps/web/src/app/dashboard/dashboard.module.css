@@ -625,6 +625,63 @@
   overflow-wrap: anywhere;
 }
 
+/* Where the receiver is paid: one row per network. */
+.payoutList {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.payoutRow {
+  display: grid;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.payoutRow:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.payoutHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.payoutHead img {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.payoutText {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.payoutText strong {
+  font-size: 15px;
+}
+
+.payoutText span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payoutText .payoutAddress {
+  color: var(--ink);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
 /* The page's QR card, opened over the dashboard. */
 .dialog {
   width: min(calc(100% - 32px), 400px);
