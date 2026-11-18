@@ -1,4 +1,4 @@
-import { networkName } from "@pomi/shared";
+import { addressKindOf, type AddressKind, networkName, wordList } from "@pomi/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
@@ -164,7 +164,7 @@ export default function PayoutScreen() {
           {choosing
             ? "Pick the network your wallet is on. Payers can pay from any network Pomi supports, and it all arrives in your own wallet. Pomi never holds it."
             : symbolsHere.length > 0
-              ? `Requests in ${symbolsHere.join(" or ")} on ${name} pay this address. It's your own wallet, and Pomi never holds your money.`
+              ? `Requests in ${wordList(symbolsHere, "or")} on ${name} pay this address. It's your own wallet, and Pomi never holds your money.`
               : `Requests on ${name} pay this address. It's your own wallet, and Pomi never holds your money.`}
         </Text>
       </View>
@@ -272,8 +272,9 @@ function NetworkChoice({
 }
 
 interface WalletLinks {
-  wallets: readonly { id: WalletId; name: string; detail: string; url: string }[];
-  more: { title: string; url: string };
+  // A wallet without a web3icons mark shows its network's.
+  wallets: readonly { id: WalletId | null; name: string; detail: string; url: string }[];
+  more: { title: string; url: string } | null;
 }
 
 // Free wallets that hold a Stellar address. Varial is the wallet formerly
@@ -314,9 +315,61 @@ const EVM_WALLETS: WalletLinks = {
   more: { title: "More wallets", url: "https://ethereum.org/wallets/find-wallet/" },
 };
 
+// Free wallets with a Solana address.
+const SOLANA_WALLETS: WalletLinks = {
+  wallets: [
+    {
+      id: "phantom",
+      name: "Phantom",
+      detail: "iPhone, Android and browser",
+      url: "https://phantom.com",
+    },
+    {
+      id: "solflare",
+      name: "Solflare",
+      detail: "iPhone, Android and browser",
+      url: "https://solflare.com",
+    },
+  ],
+  more: null,
+};
+
+// Free wallets with a Tron address. TronLink is Tron's own.
+const TRON_WALLETS: WalletLinks = {
+  wallets: [
+    {
+      id: null,
+      name: "TronLink",
+      detail: "iPhone, Android and browser",
+      url: "https://www.tronlink.org",
+    },
+    {
+      id: "trust",
+      name: "Trust Wallet",
+      detail: "iPhone, Android and browser",
+      url: "https://trustwallet.com",
+    },
+  ],
+  more: null,
+};
+
+// Starknet's own list of its wallets.
+const STARKNET_WALLETS: WalletLinks = {
+  wallets: [],
+  more: { title: "Starknet wallets", url: "https://www.starknet.io/wallets/" },
+};
+
+const WALLET_LINKS: Record<AddressKind, WalletLinks> = {
+  stellar: STELLAR_WALLETS,
+  evm: EVM_WALLETS,
+  solana: SOLANA_WALLETS,
+  tron: TRON_WALLETS,
+  starknet: STARKNET_WALLETS,
+};
+
 function NoWalletYet({ network }: { network: string }) {
   const palette = usePalette();
-  const links = network === "stellar" ? STELLAR_WALLETS : EVM_WALLETS;
+  const links = WALLET_LINKS[addressKindOf(network)];
   return (
     <View style={[styles.help, { backgroundColor: palette.surface, borderColor: palette.line }]}>
       <View style={styles.helpTop}>
@@ -336,7 +389,11 @@ function NoWalletYet({ network }: { network: string }) {
           onPress={() => void WebBrowser.openBrowserAsync(wallet.url)}
           style={[styles.walletRow, { backgroundColor: palette.fill }]}
         >
-          <WalletLogo wallet={wallet.id} size={36} />
+          {wallet.id === null ? (
+            <NetworkLogo network={network} size={36} />
+          ) : (
+            <WalletLogo wallet={wallet.id} size={36} />
+          )}
           <View style={styles.helpText}>
             <Text variant="headline">{wallet.name}</Text>
             <Text variant="footnote" tone="secondary">
@@ -346,19 +403,25 @@ function NoWalletYet({ network }: { network: string }) {
           <Icon name="external" size={14} color={palette.textTertiary} />
         </PressableScale>
       ))}
-      <Button
-        title={links.more.title}
-        variant="plain"
-        size="small"
-        icon="external"
-        onPress={() => void WebBrowser.openBrowserAsync(links.more.url)}
-      />
+      {links.more !== null && (
+        <Button
+          title={links.more.title}
+          variant="plain"
+          size="small"
+          icon="external"
+          onPress={() => {
+            if (links.more !== null) {
+              void WebBrowser.openBrowserAsync(links.more.url);
+            }
+          }}
+        />
+      )}
     </View>
   );
 }
 
 // What the server checked when it saved the address. A Stellar account is
-// read from the network; an EVM address can only be checked for how it is
+// read from the network; any other address can only be checked for how it is
 // written, so it says no more than that.
 function Checks({
   readiness,
@@ -393,10 +456,7 @@ function Checks({
       ) : checksummed ? (
         <CheckLine ok text="Its checksum matches, so there's no typo in it" />
       ) : (
-        <CheckLine
-          ok={false}
-          text={`Written all in one case, so it has no checksum and Pomi can't catch a typo. Compare it with your wallet before you share a ${name} request.`}
-        />
+        <CheckLine ok={false} text={addressFormat(network).noChecksum(name)} />
       )}
       {readiness.assets
         .filter((asset) => asset.network === network)
