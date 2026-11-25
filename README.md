@@ -83,6 +83,10 @@ pnpm test:db
 pnpm build
 ```
 
+## Questions
+
+Join us on [Discord](https://discord.gg/6xRKR9m5HH). Pomi questions go in #help with the Pomi tag.
+
 ## License
 
 [MIT](LICENSE)
